@@ -7,8 +7,8 @@ from aiogram.filters import Command
 from aiogram.types import Message, CallbackQuery
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+from aiogram.exceptions import TelegramBadRequest
 
-# Відносні імпорти для правильної структури проекту
 from utils.decorators import require_admin
 from utils.keyboards import get_worker_order_keyboard, subject_keyboard, type_work_keyboard
 from services.order_service import OrderService
@@ -17,8 +17,6 @@ from services.database import DatabaseService
 from model.order import OrderStatus, Order
 from utils.logging import logger
 from config import Config
-from config import Config as MAX_COMMENT_LENGTH
-from config import Config as ADMIN_CHANNEL_ID
 from text import type_work_text
 from utils.validators import validate_input
 
@@ -93,44 +91,34 @@ async def take_order(callback: CallbackQuery) -> None:
     """Обробляє взяття замовлення адміністратором."""
     try:
         # Отримуємо ID замовлення з callback даних
-        order_id = callback.data.split('_', 2)[2]
-        worker_id = callback.from_user.id
-        worker_username = callback.from_user.username or 'без_імені'
+        order_id = callback.data.split('_', 2)[2] # Витяг номер замовлення
+        worker_id = callback.from_user.id # Витяг ID працівника який натиснув на кнопку
+        worker_username = callback.from_user.username or 'без_імені' # Витяг ім'я працівника
         
-        # Перевіряємо статус замовлення безпосередньо в БД
-        async with aiosqlite.connect(Config.DATABASE_PATH) as db:
-            db.row_factory = aiosqlite.Row
-            async with db.execute(
-                "SELECT status FROM request_order WHERE ID_order = ?", 
-                (order_id,)
-            ) as cursor:
-                result = await cursor.fetchone()
-                
-                if not result:
-                    logger.warning(f"Замовлення {order_id} не знайдено при спробі взяття")
-                    await callback.answer("Замовлення не знайдено.", show_alert=True)
-                    return
-                
-                current_status = result['status']
-                logger.info(f"Поточний статус замовлення {order_id}: {current_status}")
-                
-                # Перевіряємо, чи статус = 1 (NEW)
-                if current_status != 1:
-                    logger.info(f"Спроба взяти вже взяте замовлення {order_id} користувачем {worker_id}")
-                    await callback.answer("Це замовлення вже взято іншим виконавцем.", show_alert=True)
-                    return
-                
-                # Оновлюємо статус замовлення на 2 (IN_PROGRESS) і встановлюємо виконавця
-                try:
-                    await db.execute(
-                        "UPDATE request_order SET status = 2, ID_worker = ? WHERE ID_order = ?",
-                        (worker_id, order_id)
-                    )
-                    await db.commit()
-                except Exception as e:
-                    logger.error(f"Помилка при оновленні статусу замовлення: {e}")
-                    await callback.answer("Не вдалося взяти замовлення. Спробуйте пізніше.", show_alert=True)
-                    return
+        # Отримуємо замовлення та перевіряємо його статус
+        order = await order_service.get_order(order_id)
+        
+        if not order:
+            logger.warning(f"Замовлення {order_id} не знайдено при спробі взяття")
+            await callback.answer("Замовлення не знайдено.", show_alert=True)
+            return
+            
+        if order.status != 1:
+            "Перевірка статусу замовлення"
+            logger.info(f"Спроба взяти вже взяте замовлення {order_id} користувачем {worker_id}")
+            await callback.answer("Це замовлення вже взято іншим виконавцем.", show_alert=True)
+            return
+        
+        # Оновлюємо статус замовлення через сервіс
+        success = await order_service.in_progress_order(
+            order_id=order_id,
+            worker_id=worker_id
+        )
+        
+        if not success:
+            logger.error(f"Не вдалося оновити статус замовлення {order_id}")
+            await callback.answer("Не вдалося взяти замовлення. Спробуйте пізніше.", show_alert=True)
+            return
         
         # Створюємо клавіатуру для оновленого повідомлення
         keyboard = InlineKeyboardBuilder()
@@ -151,8 +139,8 @@ async def take_order(callback: CallbackQuery) -> None:
 
     except Exception as e:
         logger.error(f"Помилка при взятті замовлення: {e}", exc_info=True)
-        await callback.answer("Помилка при взятті замовлення. Спробуйте пізніше.", show_alert=True)
-        
+        await callback.answer("Помилка при взятті замовлення. Спробуйте пізніше.", show_alert=True)      
+
 async def get_worker_orders(worker_id: int) -> list:
     """
     Отримує всі замовлення працівника з бази даних.
@@ -202,18 +190,39 @@ async def show_worker_orders_handler(callback: CallbackQuery) -> None:
         worker_id = callback.from_user.id
         orders = await get_worker_orders(worker_id)
 
+        # Створюємо клавіатуру для повідомлення
+        keyboard = InlineKeyboardBuilder()
+        keyboard.button(text="🔄 Оновити", callback_data="refresh_worker_orders")
+        keyboard.button(text="🔙 Назад", callback_data="back_to_admin")
+        keyboard.adjust(1)
+
         if not orders:
-            keyboard = InlineKeyboardBuilder()
-            keyboard.button(text="🔄 Оновити", callback_data="refresh_worker_orders")
-            keyboard.button(text="🔙 Назад", callback_data="back_to_admin")
-            await callback.message.edit_text(
-                "У вас немає активних замовлень.",
-                reply_markup=keyboard.as_markup()
-            )
+            try:
+                # Спробуємо оновити існуюче повідомлення
+                await callback.message.edit_text(
+                    "У вас немає активних замовлень.",
+                    reply_markup=keyboard.as_markup()
+                )
+            except TelegramBadRequest as e:
+                # Якщо повідомлення не змінилося, просто відповідаємо користувачу
+                if "message is not modified" in str(e):
+                    await callback.answer("У вас немає активних замовлень", show_alert=True)
+                else:
+                    # Якщо інша помилка, пробуємо видалити і відправити нове
+                    await callback.message.delete()
+                    await callback.message.answer(
+                        "У вас немає активних замовлень.",
+                        reply_markup=keyboard.as_markup()
+                    )
             return
 
-        await callback.message.delete()
+        # Видаляємо поточне повідомлення перед відправкою нових
+        try:
+            await callback.message.delete()
+        except Exception as e:
+            logger.warning(f"Не вдалося видалити повідомлення: {e}")
 
+        # Відправляємо нові повідомлення для кожного замовлення
         for order in orders:
             order_text = (
                 f"📌 Замовлення #{order['ID_order']}\n"
@@ -225,32 +234,37 @@ async def show_worker_orders_handler(callback: CallbackQuery) -> None:
                 f"Статус: {'🔄 В роботі' if order['status'] == OrderStatus.IN_PROGRESS.value else '🆕 Нове'}"
             )
             
-            keyboard = get_worker_order_keyboard(order['ID_order'])
-            keyboard.button(text="🔄 Оновити", callback_data="refresh_worker_orders")
-            keyboard.button(text="🔙 Назад", callback_data="back_to_admin")
-            keyboard.adjust(1)
+            order_keyboard = get_worker_order_keyboard(order['ID_order'])
+            order_keyboard.button(text="🔄 Оновити", callback_data="refresh_worker_orders")
+            order_keyboard.button(text="🔙 Назад", callback_data="back_to_admin")
+            order_keyboard.adjust(1)
             
             await callback.message.answer(
                 order_text,
-                reply_markup=keyboard.as_markup()
+                reply_markup=order_keyboard.as_markup()
             )
 
     except Exception as e:
-        logging.error(f"Помилка відображення замовлень воркера: {e}")
-        keyboard = InlineKeyboardBuilder()
-        keyboard.button(text="🔙 Назад", callback_data="back_to_admin")
-        await callback.message.edit_text(
-            "Сталася помилка при отриманні замовлень.",
-            reply_markup=keyboard.as_markup()
-        )
+        logging.error(f"Помилка відображення замовлень воркера: {e}", exc_info=True)
+        try:
+            keyboard = InlineKeyboardBuilder()
+            keyboard.button(text="🔙 Назад", callback_data="back_to_admin")
+            await callback.message.edit_text(
+                "Сталася помилка при отриманні замовлень.",
+                reply_markup=keyboard.as_markup()
+            )
+        except Exception as edit_error:
+            # Якщо не вдалося відредагувати, спробуємо відправити нове повідомлення
+            logger.error(f"Додаткова помилка при спробі відредагувати повідомлення: {edit_error}")
+            await callback.answer("Сталася помилка при отриманні замовлень", show_alert=True)
 
 @admin_orders_router.callback_query(F.data.startswith("send_work_"))
 async def send_work_to_client(callback: CallbackQuery, state: FSMContext) -> None:
     """Ініціює процес відправки виконаної роботи клієнту."""
     try:
-        order_id = str(callback.data.split("_")[1])
+        order_id = str(callback.data.split("_")[2])
         await state.set_state(OrderStates.AWAITING_WORK)
-        await state.update_data(order_id=order_id, files=[])
+        await state.update_data(order_id=order_id, files=[], messages=[])
         
         keyboard = InlineKeyboardBuilder()
         keyboard.button(text="✅ Завершити відправку", callback_data=f"finish_sending_{order_id}")
@@ -266,6 +280,211 @@ async def send_work_to_client(callback: CallbackQuery, state: FSMContext) -> Non
         logging.error(f"Помилка при ініціації відправки роботи: {e}")
         await callback.answer("Помилка при початку процесу відправки", show_alert=True)
 
+
+@admin_orders_router.message(OrderStates.AWAITING_WORK, F.text)
+async def handle_text_for_client(message: Message, state: FSMContext) -> None:
+    """Обробляє текстові повідомлення для відправки клієнту."""
+    try:
+        data = await state.get_data()
+        messages = data.get("messages", [])
+        messages.append({"type": "text", "content": message.text})
+        await state.update_data(messages=messages)
+        
+        await message.answer("✅ Текстове повідомлення додано до черги відправки")
+    except Exception as e:
+        logging.error(f"Помилка при обробці текстового повідомлення: {e}")
+        await message.answer("❌ Помилка при додаванні повідомлення")
+
+
+@admin_orders_router.message(OrderStates.AWAITING_WORK, F.photo)
+async def handle_photo_for_client(message: Message, state: FSMContext) -> None:
+    """Обробляє фото для відправки клієнту."""
+    try:
+        data = await state.get_data()
+        files = data.get("files", [])
+        
+        photo = message.photo[-1]  # Беремо найбільшу версію фото
+        file_id = photo.file_id
+        
+        caption = message.caption if message.caption else ""
+        
+        files.append({"type": "photo", "file_id": file_id, "caption": caption})
+        await state.update_data(files=files)
+        
+        await message.answer("✅ Фото додано до черги відправки")
+    except Exception as e:
+        logging.error(f"Помилка при обробці фото: {e}")
+        await message.answer("❌ Помилка при додаванні фото")
+
+
+@admin_orders_router.message(OrderStates.AWAITING_WORK, F.document)
+async def handle_document_for_client(message: Message, state: FSMContext) -> None:
+    """Обробляє документи для відправки клієнту."""
+    try:
+        data = await state.get_data()
+        files = data.get("files", [])
+        
+        file_id = message.document.file_id
+        caption = message.caption if message.caption else ""
+        
+        files.append({"type": "document", "file_id": file_id, "caption": caption})
+        await state.update_data(files=files)
+        
+        await message.answer("✅ Документ додано до черги відправки")
+    except Exception as e:
+        logging.error(f"Помилка при обробці документа: {e}")
+        await message.answer("❌ Помилка при додаванні документа")
+
+
+@admin_orders_router.message(OrderStates.AWAITING_WORK, F.video)
+async def handle_video_for_client(message: Message, state: FSMContext) -> None:
+    """Обробляє відео для відправки клієнту."""
+    try:
+        data = await state.get_data()
+        files = data.get("files", [])
+        
+        file_id = message.video.file_id
+        caption = message.caption if message.caption else ""
+        
+        files.append({"type": "video", "file_id": file_id, "caption": caption})
+        await state.update_data(files=files)
+        
+        await message.answer("✅ Відео додано до черги відправки")
+    except Exception as e:
+        logging.error(f"Помилка при обробці відео: {e}")
+        await message.answer("❌ Помилка при додаванні відео")
+
+
+@admin_orders_router.message(OrderStates.AWAITING_WORK, F.voice)
+async def handle_voice_for_client(message: Message, state: FSMContext) -> None:
+    """Обробляє голосові повідомлення для відправки клієнту."""
+    try:
+        data = await state.get_data()
+        files = data.get("files", [])
+        
+        file_id = message.voice.file_id
+        
+        files.append({"type": "voice", "file_id": file_id})
+        await state.update_data(files=files)
+        
+        await message.answer("✅ Голосове повідомлення додано до черги відправки")
+    except Exception as e:
+        logging.error(f"Помилка при обробці голосового повідомлення: {e}")
+        await message.answer("❌ Помилка при додаванні голосового повідомлення")
+        
+@admin_orders_router.callback_query(F.data.startswith("finish_sending_"))
+async def finish_sending_work(callback: CallbackQuery, state: FSMContext) -> None:
+    """Завершує процес відправки роботи та надсилає всі файли клієнту."""
+    try:
+        order_id = callback.data.split("_")[3]
+        data = await state.get_data()
+        files = data.get("files", [])
+        messages = data.get("messages", [])
+        
+        # Отримуємо інформацію про замовлення
+        order = await order_service.get_order(order_id)
+            
+        if not order:
+            await callback.answer("Замовлення не знайдено", show_alert=True)
+            await state.clear()
+            return
+        
+        client_id = order.ID_user
+        send_errors = []
+        
+        # Надсилаємо повідомлення клієнту про виконану роботу
+        try:
+            await callback.bot.send_message(
+                client_id,
+                f"✅ Ваше замовлення #{order_id} виконано!\n\n"
+                f"Нижче ви отримаєте всі матеріали від виконавця."
+            )
+        except Exception as e:
+            logger.error(f"Помилка при надсиланні початкового повідомлення: {e}")
+            send_errors.append("початкове повідомлення")
+        
+        # Надсилаємо текстові повідомлення
+        for i, msg in enumerate(messages):
+            if msg["type"] == "text":
+                try:
+                    await callback.bot.send_message(client_id, msg["content"])
+                except Exception as e:
+                    logger.error(f"Помилка при надсиланні текстового повідомлення #{i+1}: {e}")
+                    send_errors.append(f"текстове повідомлення #{i+1}")
+        
+        # Надсилаємо файли
+        for i, file in enumerate(files):
+            try:
+                if file["type"] == "photo":
+                    await callback.bot.send_photo(
+                        client_id, 
+                        file["file_id"],
+                        caption=file["caption"] if file["caption"] else None
+                    )
+                elif file["type"] == "document":
+                    await callback.bot.send_document(
+                        client_id, 
+                        file["file_id"],
+                        caption=file["caption"] if file["caption"] else None
+                    )
+                elif file["type"] == "video":
+                    await callback.bot.send_video(
+                        client_id, 
+                        file["file_id"],
+                        caption=file["caption"] if file["caption"] else None
+                    )
+                elif file["type"] == "voice":
+                    await callback.bot.send_voice(client_id, file["file_id"])
+            except Exception as e:
+                logger.error(f"Помилка при надсиланні файлу #{i+1} типу {file['type']}: {e}")
+                send_errors.append(f"файл #{i+1} ({file['type']})")
+        
+        # Оновлюємо статус замовлення
+        success = await order_service.complete_order(order_id)
+        
+        if success and not send_errors:
+            # Повідомляємо адміністратора про успішну відправку
+            await callback.message.edit_text(
+                f"✅ Всі матеріали успішно відправлено клієнту.\n"
+                f"Замовлення #{order_id} позначено як виконане."
+            )
+        elif success and send_errors:
+            await callback.message.edit_text(
+                f"⚠️ Деякі матеріали не вдалося відправити клієнту: {', '.join(send_errors)}.\n"
+                f"Замовлення #{order_id} позначено як виконане."
+            )
+        else:
+            await callback.message.edit_text(
+                f"⚠️ Виникли проблеми:\n"
+                f"- {'Деякі матеріали не вдалося відправити: ' + ', '.join(send_errors) if send_errors else 'Матеріали відправлено'}\n"
+                f"- Помилка при оновленні статусу замовлення"
+            )
+        
+        # Очищаємо стан
+        await state.clear()
+        
+    except Exception as e:
+        logging.error(f"Помилка при завершенні відправки роботи: {e}")
+        await callback.answer("Помилка при відправці матеріалів клієнту", show_alert=True)
+        await state.clear()
+        
+@admin_orders_router.callback_query(F.data.startswith("cancel_send_"))
+async def cancel_sending_work(callback: CallbackQuery, state: FSMContext) -> None:
+    """Скасовує процес відправки роботи."""
+    try:
+        order_id = callback.data.split("_")[2]
+        
+        await callback.message.edit_text(
+            f"❌ Відправку матеріалів для замовлення #{order_id} скасовано."
+        )
+        
+        await state.clear()
+        
+    except Exception as e:
+        logging.error(f"Помилка при скасуванні відправки роботи: {e}")
+        await callback.answer("Помилка при скасуванні відправки", show_alert=True)
+        await state.clear()
+        
 @admin_orders_router.callback_query(F.data.startswith("complete_order_"))
 @require_admin
 async def complete_order(callback: CallbackQuery) -> None:
@@ -368,50 +587,33 @@ async def process_details(message: Message, state: FSMContext):
         # Отримуємо дані зі стану
         data = await state.get_data()
         
-        # Готуємо дані замовлення з правильними назвами полів
+        # Готуємо дані замовлення
         order_data = {
-            "ID_user": message.from_user.id,  # Виправлено на великий регістр
             "subject": data["subject"],
             "type_work": data["type_work"],
-            "order_details": comment,
-            "status": OrderStatus.NEW.value,  # Використовуємо enum
-            "created_at": datetime.now().isoformat()
         }
         
-        # Створюємо замовлення через сервіс
-        new_id = await order_service.create_order(order_data)
+        # Використовуємо сервіс для створення замовлення та відправки повідомлення адміну
+        new_id = await order_service.process_new_order(
+            user_id=message.from_user.id,
+            username=message.from_user.username or 'Без нікнейма',
+            order_data=order_data,
+            comment=comment,
+            bot=message.bot
+        )
+        
         if not new_id:
-            raise ValueError("Failed to create order")
+            raise ValueError("Не вдалося створити замовлення")
 
-        # Відправляємо повідомлення адміну
-        builder = InlineKeyboardBuilder()
-        builder.button(
-            text="Взяти замовлення", 
-            callback_data=f"take_order_{new_id}"
-        )
-        
-        admin_message = (
-            f"--- Нове замовлення ---\n"
-            f"<b>Час:</b> {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-            f"<b>ID замовлення:</b> {new_id}\n"
-            f"<b>Від:</b> @{message.from_user.username or 'Без нікнейма'}\n"
-            f"<b>Предмет:</b> {data['subject']}\n"
-            f"<b>Тип роботи:</b> {data['type_work']}\n"
-            f"<b>Деталі замовлення:</b> {comment}\n"
-            f"---------------------------"
-        )
-        
-        await message.bot.send_message(
-            Config.ADMIN_CHANNEL_ID,
-            admin_message,
-            parse_mode="HTML",
-            reply_markup=builder.as_markup()
-        )
-        
         await message.answer("Ваше замовлення успішно створено та відправлено на обробку!")
         await state.clear()
         
     except Exception as e:
-        logger.error(f"Error in process_details: {e}")
-        await message.answer("Виникла помилка при створенні замовлення. Спробуйте пізніше.")
+        logger.error(f"Помилка в process_details: {e}")
+        await message.answer("Виникла помилка при створенні замовлення. Спробуйте пізніше.ити замовлення")
         await state.clear()
+
+
+        await message.answer("Ваше замовлення успішно створено та відправлено на обробку!")
+        await state.clear()
+        

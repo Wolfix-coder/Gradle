@@ -1,16 +1,17 @@
-from typing import List, Optional, Dict, Any
-from datetime import datetime
 import aiosqlite
 import traceback
+
+from typing import List, Optional, Dict, Any
+from datetime import datetime
 from aiogram import Bot
+
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+from model.order import Order, OrderStatus
 
 from config import Config
-from model.order import Order, OrderStatus
 from utils.logging import logger
 
 class OrderService:
-    """Service class for managing orders in the database."""
     
     def __init__(self):
         self.db_path = Config.DATABASE_PATH
@@ -48,7 +49,7 @@ class OrderService:
                 await db.close()
 
     async def get_order(self, order_id: str) -> Order:
-        """Retrieves a specific order by ID with user information."""
+        """Отримує певне замовлення за ідентифікатором з інформацією про користувача."""
         db = None
         try:
             db = await self._get_db_connection()
@@ -104,106 +105,33 @@ class OrderService:
             if db:
                 await db.close()
 
-    async def update_order_status_debug(self, order_id: str, worker_id: int, status: OrderStatus) -> bool:
-        """
-        Розширена версія update_order_status з додатковим логуванням для діагностики.
-        
-        Args:
-            order_id: Order identifier
-            worker_id: ID of the worker taking the order
-            status: New status to set
-            
-        Returns:
-            bool: True if order was successfully updated, False otherwise
-        """
+
+    async def in_progress_order(self, order_id: str, worker_id: int) -> bool:
         db = None
         try:
-            logger.info(f"Starting update_order_status for order {order_id}, worker {worker_id}, status {status.name}")
-            
             db = await self._get_db_connection()
-            logger.info(f"Database connection established: {self.db_path}")
-            
-            # Перевіряємо, чи існує замовлення
-            check_query = "SELECT ID_order, status FROM request_order WHERE ID_order = ?"
-            logger.info(f"Executing query: {check_query} with params: ({order_id},)")
-            
-            async with db.execute(check_query, (order_id,)) as cursor:
-                row = await cursor.fetchone()
-                if not row:
-                    logger.error(f"Order {order_id} not found in database")
-                    return False
-                
-                logger.info(f"Order found: {dict(row)}")
-                current_status = row['status']
-                
-                if current_status != OrderStatus.NEW.value:
-                    logger.info(f"Order {order_id} has status {current_status}, expected {OrderStatus.NEW.value}")
-                    return False
-
-            # Оновлюємо статус замовлення
             current_time = datetime.now().isoformat()
-            logger.info(f"Current time for update: {current_time}")
-            
-            update_query = """
+            query = """
                 UPDATE request_order 
-                SET ID_worker = ?,
-                    status = ?,
-                    taken_at = ?,
+                SET status = ?, ID_worker = ?, updated_at = ?
                 WHERE ID_order = ?
-                AND status = ?
             """
-            
-            logger.info(f"Executing update query with params: ({worker_id}, {status.value}, {current_time}, {current_time}, {order_id}, {OrderStatus.NEW.value})")
-            
-            cursor = await db.execute(
-                update_query,
-                (worker_id, status.value, current_time, order_id, OrderStatus.NEW.value)
-            )
-            
-            affected_rows = cursor.rowcount
-            logger.info(f"Update affected {affected_rows} rows")
-            
-            if affected_rows == 0:
-                # Додаткова перевірка, чому не оновилося
-                async with db.execute("SELECT ID_order, status FROM request_order WHERE ID_order = ?", (order_id,)) as check_cursor:
-                    check_row = await check_cursor.fetchone()
-                    if check_row:
-                        logger.warning(f"Order exists but not updated. Current status: {check_row['status']}, expected: {OrderStatus.NEW.value}")
-                    else:
-                        logger.warning(f"Order {order_id} not found after update attempt")
-                return False
-            
-            # Перевіряємо, чи дійсно оновилося
+
+            await db.execute(query, (
+                OrderStatus.IN_PROGRESS.value,
+                worker_id,
+                current_time,
+                order_id
+            ))
             await db.commit()
-            logger.info(f"Database commit successful")
-            
-            # Перевірка після оновлення
-            async with db.execute("SELECT ID_order, status, ID_worker FROM request_order WHERE ID_order = ?", (order_id,)) as verify_cursor:
-                verify_row = await verify_cursor.fetchone()
-                if verify_row:
-                    logger.info(f"Verification after update: {dict(verify_row)}")
-                else:
-                    logger.warning("Verification failed: order not found after update")
-            
             return True
-            
+        
         except Exception as e:
-            logger.error(f"Error updating order status: {e}")
-            logger.error(f"Traceback: {traceback.format_exc()}")
-            if db:
-                try:
-                    await db.rollback()
-                    logger.info("Transaction rolled back")
-                except Exception as rollback_error:
-                    logger.error(f"Error during rollback: {rollback_error}")
+            logger.error(f"Error update status order {order_id} IN_PROGRESS: {e}")
             return False
         finally:
             if db:
-                try:
-                    await db.close()
-                    logger.info("Database connection closed")
-                except Exception as close_error:
-                    logger.error(f"Error closing database connection: {close_error}")
+                await db.close()
 
 
     async def complete_order(self, order_id: str) -> bool:
@@ -226,7 +154,7 @@ class OrderService:
             await db.commit()
             return True
         except Exception as e:
-            logger.error(f"Error completing order {order_id}: {e}")
+            logger.error(f"Error update status order {order_id} COMPLETED: {e}")
             return False
         finally:
             if db:

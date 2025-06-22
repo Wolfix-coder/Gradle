@@ -25,7 +25,7 @@ setup(
     ],
     entry_points={
         'console_scripts': [
-            'telegram-bot=bot.main:main',
+            'telegram-bot=bot.src.main:main',
         ],
     },
 )

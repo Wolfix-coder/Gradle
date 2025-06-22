@@ -4,11 +4,11 @@ from typing import Optional
 from enum import Enum
 
 class OrderStatus(Enum):
-    NEW = 1
-    IN_PROGRESS = 2
-    COMPLETED = 3
-    CANCELLED = 4
-    PENDING_CONFIRMATION = 5
+    NEW = 1 # замовлення створено
+    IN_PROGRESS = 2 # замовлення виконується
+    COMPLETED = 3 # замовлення виконано
+    CANCELLED = 4 # замовлення скасовано
+    PENDING_CONFIRMATION = 5 
 
 @dataclass
 class Order:

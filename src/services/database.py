@@ -131,6 +131,7 @@ class DatabaseService:
                         created_at TEXT NOT NULL,
                         taken_at TEXT,
                         completed_at TEXT,
+                        updated_at TEXT,
                         FOREIGN KEY (ID_user) REFERENCES users(ID)
                     )
                 """)
