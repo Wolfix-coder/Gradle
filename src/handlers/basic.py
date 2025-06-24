@@ -1,14 +1,15 @@
 from aiogram import Router, types
 from aiogram import F
 from aiogram.filters import Command
+
 from config import Config
 from text import help_text, about_text, price_text
 
 router = Router()
 
-@router.message(F.text("Допомога"))
+@router.message(F.text.lower().contains("допомога"))
 async def text_help(message: types.Message):
-    await message.answer(help_text)
+    await message.answer(help_text, reply_markup=types.ReplyKeyboardRemove())
 
 @router.message(Command("help"))
 async def help_handler(message: types.Message):

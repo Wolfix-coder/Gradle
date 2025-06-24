@@ -1,5 +1,6 @@
 from .admin import admin_router
 from .orders import users_orders_router, admin_orders_router
+from .basic import *
 from .payments import *
 from .statistics import *
 
