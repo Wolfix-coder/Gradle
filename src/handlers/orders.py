@@ -376,7 +376,7 @@ async def handle_voice_for_client(message: Message, state: FSMContext) -> None:
 async def finish_sending_work(callback: CallbackQuery, state: FSMContext) -> None:
     """Завершує процес відправки роботи та надсилає всі файли клієнту."""
     try:
-        order_id = callback.data.split("_")[3]
+        order_id = callback.data.split("_")[2]
         data = await state.get_data()
         files = data.get("files", [])
         messages = data.get("messages", [])
@@ -464,7 +464,7 @@ async def finish_sending_work(callback: CallbackQuery, state: FSMContext) -> Non
         await state.clear()
         
     except Exception as e:
-        logging.error(f"Помилка при завершенні відправки роботи: {e}")
+        logger.error(f"Помилка при завершенні відправки роботи: {e}")
         await callback.answer("Помилка при відправці матеріалів клієнту", show_alert=True)
         await state.clear()
         

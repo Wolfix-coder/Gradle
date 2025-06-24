@@ -5,6 +5,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 import logging
 
 from utils.decorators import require_admin
+from services.database import DatabaseService
 from services.payment_service import PaymentService
 from model.order import OrderStatus
 
@@ -17,6 +18,10 @@ payment_service = PaymentService()
 @payments_router.message(Command("pay"))
 async def initiate_payment(message: Message) -> None:
     try:
+        if not await DatabaseService.check_user_exists(message.from_user.id):
+            await message.answer("Спочатку потрібно зареєструватися. Використайте команду /start")
+            return
+        
         unpaid_orders = await payment_service.get_unpaid_orders(message.from_user.id)
         
         if not unpaid_orders:
