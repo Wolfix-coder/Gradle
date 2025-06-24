@@ -7,7 +7,6 @@ def get_admin_keyboard() -> InlineKeyboardBuilder:
     keyboard = InlineKeyboardBuilder()
     keyboard.button(text="📋 Нові замовлення", callback_data="new_orders")
     keyboard.button(text="📋 Мої замовлення", callback_data="my_orders")
-    keyboard.button(text="✅ Завершені замовлення", callback_data="my_completed_orders")
     keyboard.button(text="📊 Статистика", callback_data="my_statistics")
     keyboard.adjust(1)
     return keyboard
