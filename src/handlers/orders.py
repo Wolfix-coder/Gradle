@@ -122,7 +122,7 @@ async def take_order(callback: CallbackQuery) -> None:
         
         # Створюємо клавіатуру для оновленого повідомлення
         keyboard = InlineKeyboardBuilder()
-        keyboard.button(text="📋 Мої активні замовлення", callback_data="my_active_orders")
+        keyboard.button(text="📋 Мої активні замовлення", callback_data="my_orders")
         keyboard.button(text="🔙 Назад", callback_data="back_to_admin")
         keyboard.adjust(1)  # Розміщуємо кнопки в один стовпчик
 
@@ -439,26 +439,40 @@ async def finish_sending_work(callback: CallbackQuery, state: FSMContext) -> Non
                 logger.error(f"Помилка при надсиланні файлу #{i+1} типу {file['type']}: {e}")
                 send_errors.append(f"файл #{i+1} ({file['type']})")
         
-        # Оновлюємо статус замовлення
-        success = await order_service.complete_order(order_id)
+        # # # Оновлюємо статус замовлення
+        # # success = await order_service.complete_order(order_id)
         
-        if success and not send_errors:
-            # Повідомляємо адміністратора про успішну відправку
-            await callback.message.edit_text(
-                f"✅ Всі матеріали успішно відправлено клієнту.\n"
-                f"Замовлення #{order_id} позначено як виконане."
+        # if success and not send_errors:
+        #     # Повідомляємо адміністратора про успішну відправку
+        #     await callback.message.edit_text(
+        #         f"✅ Всі матеріали успішно відправлено клієнту.\n"
+        #         f"Замовлення #{order_id} позначено як виконане."
+        #     )
+        # elif success and send_errors:
+        #     await callback.message.edit_text(
+        #         f"⚠️ Деякі матеріали не вдалося відправити клієнту: {', '.join(send_errors)}.\n"
+        #         f"Замовлення #{order_id} позначено як виконане."
+        #     )
+        # else:
+        #     await callback.message.edit_text(
+        #         f"⚠️ Виникли проблеми:\n"
+        #         f"- {'Деякі матеріали не вдалося відправити: ' + ', '.join(send_errors) if send_errors else 'Матеріали відправлено'}\n"
+        #         f"- Помилка при оновленні статусу замовлення"
+        #     )
+
+        try:
+            keyboard = InlineKeyboardBuilder()
+            keyboard.button(text="✅ Все ОК", callback_data=f"complete_order_{order_id}")
+            keyboard.button(text="❌ Потрібні правки", callback_data=f"fix_work_{order_id}")
+
+            await callback.bot.send_message(
+                client_id,
+                "Підтвердіть виконання роботи.",
+                reply_markup=keyboard.as_markup()
             )
-        elif success and send_errors:
-            await callback.message.edit_text(
-                f"⚠️ Деякі матеріали не вдалося відправити клієнту: {', '.join(send_errors)}.\n"
-                f"Замовлення #{order_id} позначено як виконане."
-            )
-        else:
-            await callback.message.edit_text(
-                f"⚠️ Виникли проблеми:\n"
-                f"- {'Деякі матеріали не вдалося відправити: ' + ', '.join(send_errors) if send_errors else 'Матеріали відправлено'}\n"
-                f"- Помилка при оновленні статусу замовлення"
-            )
+        except Exception as e:
+            logger.error(f"Помилка при надсиланні повідомлення підтвердження виконання роботи (463): {e}")
+            await callback.answer("Помилка при надсиланні повідомлення підтвердження виконання роботи", show_alert=True)
         
         # Очищаємо стан
         await state.clear()
@@ -467,7 +481,7 @@ async def finish_sending_work(callback: CallbackQuery, state: FSMContext) -> Non
         logger.error(f"Помилка при завершенні відправки роботи: {e}")
         await callback.answer("Помилка при відправці матеріалів клієнту", show_alert=True)
         await state.clear()
-        
+
 @admin_orders_router.callback_query(F.data.startswith("cancel_send_"))
 async def cancel_sending_work(callback: CallbackQuery, state: FSMContext) -> None:
     """Скасовує процес відправки роботи."""
@@ -486,25 +500,40 @@ async def cancel_sending_work(callback: CallbackQuery, state: FSMContext) -> Non
         await state.clear()
         
 @admin_orders_router.callback_query(F.data.startswith("complete_order_"))
-@require_admin
 async def complete_order(callback: CallbackQuery) -> None:
     """Позначає замовлення як виконане."""
     try:
-        order_id = str(callback.data.split("_")[1])
-        worker_id = callback.from_user.id
+        order_id = str(callback.data.split("_")[2])
+
+        # Отримуємо інформацію про замовлення
+        order = await order_service.get_order(order_id)
+
+        worker_id = order.ID_worker
+        client_id = order.ID_user
         
         await order_service.complete_order(order_id)
         
         keyboard = InlineKeyboardBuilder()
-        keyboard.button(text="📋 Мої активні замовлення", callback_data="my_active_orders")
+        keyboard.button(text="📋 Мої активні замовлення", callback_data="my_orders")
         keyboard.button(text="🔙 Назад", callback_data="back_to_admin")
         keyboard.adjust(1)
 
-        await callback.message.edit_text(
-            f"{callback.message.text}\n\n✅ Замовлення виконано!",
+        await callback.bot.send_message(
+            worker_id,
+            f"✅ Замовлення виконано!",
             reply_markup=keyboard.as_markup()
         )
         await callback.answer("Замовлення позначено як виконане!", show_alert=True)
+
+        await callback.bot.send_message(
+            client_id,
+            text = (
+                f"✅ Замовлення #{order_id} позначено як виконане."
+                f" Дякуємо що обираєте нас!"
+            )
+        )
+
+        await state.clear()
 
     except Exception as e:
         logging.error(f"Помилка при завершенні замовлення: {e}")
@@ -610,10 +639,6 @@ async def process_details(message: Message, state: FSMContext):
         
     except Exception as e:
         logger.error(f"Помилка в process_details: {e}")
-        await message.answer("Виникла помилка при створенні замовлення. Спробуйте пізніше.ити замовлення")
+        await message.answer("Виникла помилка при створенні замовлення. Спробуйте пізніше")
         await state.clear()
 
-
-        await message.answer("Ваше замовлення успішно створено та відправлено на обробку!")
-        await state.clear()
-        

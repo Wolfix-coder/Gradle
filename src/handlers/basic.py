@@ -13,20 +13,22 @@ async def text_help(message: types.Message):
 
 @router.message(Command("help"))
 async def help_handler(message: types.Message):
-    await message.answer(help_text)
+    await message.answer(help_text, reply_markup=types.ReplyKeyboardRemove())
 
 @router.message(Command("about"))
 async def cmd_about(message: types.Message):
-    await message.answer(about_text)
+    await message.answer(about_text, reply_markup=types.ReplyKeyboardRemove())
 
 @router.message(Command("price"))
 async def cmd_price(message: types.Message):
-    await message.answer(price_text)
+    await message.answer(price_text, reply_markup=types.ReplyKeyboardRemove())
 
 @router.message(Command("support"))
 async def cmd_support(message: types.Message):
-    await message.answer(f"Натисніть для переходу до підтримки: {Config.support_url}")
+    await message.answer(f"Натисніть для переходу до підтримки: {Config.support_url}", 
+                         reply_markup=types.ReplyKeyboardRemove())
 
 @router.message(Command("report"))
 async def cmd_report(message: types.Message):
-    await message.answer(f"Натисніть для переходу до підтримки: {Config.support_url}")
+    await message.answer(f"Натисніть для переходу до підтримки: {Config.support_url}", 
+                         reply_markup=types.ReplyKeyboardRemove())
