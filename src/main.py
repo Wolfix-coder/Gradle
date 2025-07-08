@@ -1,5 +1,4 @@
 import asyncio
-import logging
 import signal
 from contextlib import suppress
 from aiogram import Bot, Dispatcher

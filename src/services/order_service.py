@@ -96,6 +96,19 @@ class OrderService:
                 1,
                 datetime.now().isoformat()
             ))
+
+            query = """
+                INSERT INTO payments (
+                    ID_order, status, created_at
+                ) VALUES (?, ?, ?)
+            """
+
+            await db.execute(query, (
+                new_id,
+                False,
+                datetime.now().isoformat()
+            ))
+
             await db.commit()
             return new_id
         except Exception as e:
@@ -168,7 +181,7 @@ class OrderService:
         comment: str,
         bot: Bot
     ) -> Optional[str]:
-        """Process new order creation and send admin notification."""
+        """Створення нового замовлення та надсилання повідомлення адміністратору."""
         try:
             prepared_order = {
                 "ID_user": user_id,

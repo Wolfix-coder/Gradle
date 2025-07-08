@@ -500,7 +500,7 @@ async def cancel_sending_work(callback: CallbackQuery, state: FSMContext) -> Non
         await state.clear()
         
 @admin_orders_router.callback_query(F.data.startswith("complete_order_"))
-async def complete_order(callback: CallbackQuery) -> None:
+async def complete_order(callback: CallbackQuery, state: FSMContext) -> None:
     """Позначає замовлення як виконане."""
     try:
         order_id = str(callback.data.split("_")[2])

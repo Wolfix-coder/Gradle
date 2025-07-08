@@ -11,6 +11,12 @@ def get_admin_keyboard() -> InlineKeyboardBuilder:
     keyboard.adjust(1)
     return keyboard
 
+def get_user_pay_keyboard() -> InlineKeyboardBuilder:
+    keyboard = InlineKeyboardBuilder()
+    keyboard.button(text="Не оплачені замовлення", callback_data="unpaid_order")
+    keyboard.adjust(1)
+    return keyboard
+
 def get_worker_order_keyboard(order_id: str) -> InlineKeyboardBuilder:
     keyboard = InlineKeyboardBuilder()
     keyboard.button(text="📤 Відправити роботу", callback_data=f"send_work_{order_id}")
