@@ -1,4 +1,5 @@
 from aiogram import Router, types, F
+from aiogram.enums import ParseMode
 from aiogram.types import Message, CallbackQuery
 from aiogram.filters import Command
 from aiogram.utils.keyboard import InlineKeyboardBuilder
@@ -9,6 +10,9 @@ from services.payment_service import PaymentService
 from utils.decorators import require_admin
 from utils.keyboards import get_user_pay_keyboard
 from utils.logging import logger
+
+from config import Config
+from text import help_text
 
 # Створюємо роутер
 payments_router = Router()
@@ -50,7 +54,7 @@ async def show_unpaid_order(callback: CallbackQuery) -> None:
             keyboard.adjust(2, 1)
 
             # Визначаємо статус оплати для кожного платежу
-            payment_status = "❌ Не оплачено" if payment.status == 0 else "✅ Оплачено"
+            payment_status = "❌ Не оплачено" if int(payment.status) == 0 else "✅ Оплачено"
                     
             payment_text = (
                 f"📌 Замовлення #{payment.ID_order}\n"
@@ -72,3 +76,98 @@ async def show_unpaid_order(callback: CallbackQuery) -> None:
             "❌ Помилка при отриманні не оплачених замовлень.",
             reply_markup=get_user_pay_keyboard().as_markup()
         )
+
+@payments_router.callback_query(F.data == "back_to_home")
+async def back_home (callback: CallbackQuery) -> None:
+    try:
+        await callback.message.answer(help_text, reply_markup=types.ReplyKeyboardRemove())
+    
+    except Exception as e:
+        logger.error(f"Помилка при переході до головного меню юзера: {e}")
+        await callback.message.answer("Виникла помилка при переході назад. Будь ласка, введіть команду /help.")
+
+@payments_router.callback_query(F.data.startswith("pay_order_"))
+async def pay_order(callback: CallbackQuery) -> None:
+    try:
+        await callback.answer()
+
+        payment_service = PaymentService()
+        order_id = str(callback.data.split('_', 2)[2])  # Витяг номера замовлення для оплати
+
+        # Тепер передаємо order_id як параметр
+        order = await payment_service.get_unpaid_orders(order_id=order_id)
+
+        if not order:
+            logger.warning(f"Замовлення {order_id} не знайдено при спробі оплати")
+            await callback.answer("Замовлення не знайдено.", show_alert=True)
+            return
+            
+        # Перевірка статусу - якщо статус не 0 (неоплачено), то замовлення вже оплачено
+        if int(order.status) != 0:
+            logger.info(f"Замовлення {order_id} вже оплачено.")
+            await callback.answer("Це замовлення вже оплачено.", show_alert=True)
+            return
+            
+        try:
+            keyboard = InlineKeyboardBuilder()
+            keyboard.button(text="Оплатити", callback_data=f"paid_{order.ID_order}")
+
+            money = 1 #order.price - order.paid
+            
+            await callback.message.answer(
+                text=(
+                    f"💳 <b>Оплата</b>\n\n"
+                    f"Переведіть <b>{money} грн</b> на картку:\n"
+                    f"<code>{Config.PAYMENT_TOKEN}</code>\n\n"
+                    f"Після переказу коштів натисніть кнопку нижче, щоб повідомити адміністратора.\n\n"
+                    f"<i>Для копіювання номера картки просто натисніть на неї.</i>"
+                ),
+                parse_mode="HTML",
+                reply_markup=keyboard.as_markup()
+            )
+
+        except Exception as e:
+            logger.error(f"Помилка процесу оплати: {e}")
+            await callback.message.answer()
+    
+    except ValueError:
+        logger.error(f"Невірний формат order_id: {callback.data}")
+        await callback.answer("Помилка в номері замовлення.", show_alert=True)
+    except Exception as e:
+        logger.error(f"Помилка при обробці оплати: {e}")
+        await callback.answer("Виникла помилка при обробці оплати.", show_alert=True)
+
+@payments_router.callback_query(F.data.startswith("paid_"))
+async def notify_admin_about_payment(callback: CallbackQuery) -> None:
+    try:
+        user_id = callback.from_user.id
+
+        payment_service = PaymentService()
+        order_id = str(callback.data.split('_', 1)[1])  # Витяг номера замовлення для оплати
+
+        # Тепер передаємо order_id як параметр
+        order = await payment_service.get_unpaid_orders(order_id=order_id)
+
+        money = 1 #order.price - order.paid
+
+        keyboard = InlineKeyboardBuilder()
+        keyboard.button(text="Підтвердити", callback_data=f"confirm_{order_id}")
+        keyboard.button(text="Відхилити", callback_data=f"reject_{order_id}")
+        
+        # Відправляємо повідомлення адміністратору
+        await callback.answer()
+        await callback.bot.send_message(
+            text=(
+                f"🧾 Новий запит на перевірку оплати\n\n"
+                f"👤 Користувач: <code>{user_id}</code>\n"
+                f"🆔 Замовлення: <b>{order_id}</b>\n"
+                f"💰 Сума: <b>{money} грн</b>\n\n"
+                f"Перевірте оплату й підтвердьте вручну."
+            ),
+            chat_id=int(order.ID_worker),
+            parse_mode="HTML",
+            reply_markup=keyboard.as_markup()
+        )
+    except Exception as e:
+        logger.error(f"Помилка при відправці повідомлення адміністратору для підтвердження оплати: {e}")
+        await callback.answer("Щось пішло не так. Спробуйте ще раз або зверніться в підтримку командою /support.", show_alert=True)
