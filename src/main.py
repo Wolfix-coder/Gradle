@@ -48,8 +48,10 @@ class BotRunner:
     async def init_services(self):
         """Ініціалізація всіх сервісів."""
         try:
-            await DatabaseService.create_tables()
-            logger.info("Таблиці бази даних успішно створені")
+            if await DatabaseService.create_tables() == True:
+                logger.info("Таблиці бази даних успішно створені")
+            else:
+                logger.error(f"Помилка при створені створені БД")
         except Exception as e:
             logger.error(f"Помилка ініціалізації сервісів: {e}")
             raise

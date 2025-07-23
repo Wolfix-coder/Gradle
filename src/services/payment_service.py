@@ -1,5 +1,6 @@
 import aiosqlite
 
+from datetime import datetime
 from typing import List, Optional, Union
 
 from config import Config
@@ -23,12 +24,13 @@ class PaymentService:
             logger.error(f"Error creating database connection: {e}")
             raise
 
-    async def get_unpaid_orders(self, order_id: Optional[int] = None) -> Union[List[Payments], Payments, None]:
+    async def get_unpaid_orders(self, status: int, order_id: Optional[int] = None) -> Union[List[Payments], Payments, None]:
         """
         Отримання не оплачених замовлень
         
         Args:
             order_id: Якщо вказано, повертає конкретне замовлення. Якщо None - всі неоплачені замовлення
+            status: int
             
         Returns:
             List[Payments] якщо order_id=None
@@ -42,20 +44,20 @@ class PaymentService:
             if order_id is not None:
                 # Отримання конкретного замовлення
                 query = """
-                    SELECT p.*, ro.ID_worker, ro.subject, ro.type_work, ro.order_details
+                    SELECT p.*, o.ID_user, o.ID_worker, o.subject, o.type_work, o.order_details
                     FROM payments p
-                    JOIN request_order ro ON p.ID_order = ro.ID_order
-                    WHERE p.status = 0 AND p.ID_order = ?
+                    JOIN order o ON p.ID_order = o.ID_order
+                    WHERE p.status = ? AND p.ID_order = ?
                 """
-                async with db.execute(query, (order_id,)) as cursor:
+                async with db.execute(query, (order_id, status)) as cursor:
                     row = await cursor.fetchone()
                     return Payments(**dict(row)) if row else None
             else:
                 # Отримання всіх неоплачених замовлень
                 query = """
-                    SELECT p.*, ro.ID_worker, ro.subject, ro.type_work, ro.order_details
+                    SELECT p.*, o.ID_user, o.ID_worker, o.subject, o.type_work, o.order_details
                     FROM payments p
-                    JOIN request_order ro ON p.ID_order = ro.ID_order
+                    JOIN order o ON p.ID_order = o.ID_order
                     WHERE p.status = 0
                     ORDER BY p.created_at DESC
                 """
@@ -69,3 +71,21 @@ class PaymentService:
         finally:
             if db:
                 await db.close()
+
+    async def mark_confirm_pay(self, order_id: str) -> bool:
+        """Змінення статусу оплати на ОПЛАЧЕНО (1)"""
+
+        try:
+            async with await self._get_db_connection() as db:
+                current_time = datetime.now().isoformat()
+                query = """
+                UPDATE orders SET status = ?, paid_at = ?
+                WHERE order_id = ?
+                """
+                await db.execute(query, (1, current_time, order_id))
+                await db.commit()
+                return True
+
+        except Exception as e:
+            logger.error(f"Замовлення {order_id} не позначено як оплачене: {e}")
+            return False

@@ -78,7 +78,7 @@ class OrderService:
                 # Отримуємо кількість виконаних замовлень
                 async with db.execute("""
                     SELECT COUNT(*) as count 
-                    FROM request_order 
+                    FROM order 
                     WHERE ID_worker = ? AND status = ?
                 """, (worker_id, OrderStatus.COMPLETED.value)) as cursor:
                     completed = await cursor.fetchone()
@@ -87,7 +87,7 @@ class OrderService:
                 # Отримуємо кількість активних замовлень
                 async with db.execute("""
                     SELECT COUNT(*) as count 
-                    FROM request_order 
+                    FROM order 
                     WHERE ID_worker = ? AND status = ?
                 """, (worker_id, OrderStatus.IN_PROGRESS.value)) as cursor:
                     active = await cursor.fetchone()
@@ -96,7 +96,7 @@ class OrderService:
                 # Отримуємо топ предметів
                 async with db.execute("""
                     SELECT subject, COUNT(*) as count 
-                    FROM request_order 
+                    FROM order 
                     WHERE ID_worker = ? AND status = ?
                     GROUP BY subject 
                     ORDER BY count DESC 

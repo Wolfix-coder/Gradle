@@ -156,24 +156,24 @@ async def get_worker_orders(worker_id: int) -> list:
             db.row_factory = aiosqlite.Row
             async with db.execute("""
                 SELECT 
-                    ro.ID_order,
-                    ro.subject,
-                    ro.type_work,
-                    ro.order_details,
-                    ro.created_at,
-                    ro.status,
+                    o.ID_order,
+                    o.subject,
+                    o.type_work,
+                    o.order_details,
+                    o.created_at,
+                    o.status,
                     u.user_name,
                     u.user_link
-                FROM request_order ro
-                LEFT JOIN users u ON ro.ID_user = u.ID
-                WHERE ro.ID_worker = ? 
-                AND ro.status IN (?, ?)
+                FROM order o
+                LEFT JOIN users u ON o.ID_user = u.ID
+                WHERE o.ID_worker = ? 
+                AND o.status IN (?, ?)
                 ORDER BY 
-                    CASE ro.status 
+                    CASE o.status 
                         WHEN ? THEN 1 
                         WHEN ? THEN 2 
                     END,
-                    ro.created_at DESC
+                    o.created_at DESC
             """, (worker_id, 
                   OrderStatus.IN_PROGRESS.value,
                   OrderStatus.NEW.value,

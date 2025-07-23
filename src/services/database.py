@@ -35,14 +35,12 @@ class DBConnection:
 
 class DatabaseService:
     @staticmethod
-    async def create_tables():
+    async def create_tables() -> bool:
         try:
             async with aiosqlite.connect(Config.DATABASE_PATH) as db:
                 try:
                     await db.execute("""
                         CREATE TABLE IF NOT EXISTS users (
-                        ID INTEGER PRIMARY KEY,
-                        user_name TEXT NOT NULL,
                             ID INTEGER PRIMARY KEY,
                             user_name TEXT NOT NULL,
                             user_link TEXT,
@@ -58,12 +56,12 @@ class DatabaseService:
                     """)
                     await db.commit()
                 except aiosqlite.Error as e:
-                    logger.error("Error create table users: {e}")
+                    logger.error(f"Error create table users: {e}")
 
             try:
                 async with aiosqlite.connect(Config.DATABASE_PATH) as db:
                     await db.execute("""
-                        CREATE TABLE IF NOT EXISTS request_order (
+                        CREATE TABLE IF NOT EXISTS order (
                             ID_order TEXT PRIMARY KEY,
                             ID_user INTEGER NOT NULL,
                             ID_worker INTEGER,
@@ -80,7 +78,7 @@ class DatabaseService:
                     """)
                     await db.commit()
             except aiosqlite.Error as e:
-                    logger.error("Error create table request_order: {e}")
+                    logger.error(f"Error create table order: {e}")
 
             try:
                 # Таблиця платежів
@@ -96,8 +94,10 @@ class DatabaseService:
                         paid_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     )
                 """)
+                
+                return True
             except aiosqlite.Error as e:
-                    logger.error("Error create table payments: {e}")
+                    logger.error(f"Error create table payments: {e}")
         
         except aiosqlite.Error as e:
             logger.error(f"Database error during table creation: {e}")

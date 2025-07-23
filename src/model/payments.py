@@ -6,6 +6,7 @@ class Payments:
     id_operation: int
     ID_order: str   # Не міняти !!!
     ID_worker: str
+    ID_user: str
     subject: str
     type_work: int
     order_details: str

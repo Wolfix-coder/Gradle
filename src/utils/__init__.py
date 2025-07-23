@@ -1,7 +1,7 @@
 from .decorators import require_admin
 from .keyboards import get_admin_keyboard, get_user_pay_keyboard, get_worker_order_keyboard, subject_keyboard, type_work_keyboard
 from .logging import logger
-from .validators import validate_course, validate_input
+from .validators import validate_course, validate_input, _validate_table_column
 
 __all__ = [
     'require_admin',
@@ -12,5 +12,6 @@ __all__ = [
     'type_work_keyboard',
     'logger',
     'validate_course', 
-    'validate_input'
+    'validate_input',
+    '_validate_table_column'
 ]

@@ -32,11 +32,11 @@ class OrderService:
         try:
             db = await self._get_db_connection()
             query = """
-                SELECT ro.*, u.user_name, u.user_link
-                FROM request_order ro
-                JOIN users u ON ro.ID_user = u.ID
-                WHERE ro.status = ?
-                ORDER BY ro.created_at DESC
+                SELECT o.*, u.user_name, u.user_link
+                FROM order o
+                JOIN users u ON o.ID_user = u.ID
+                WHERE o.status = ?
+                ORDER BY o.created_at DESC
             """
             async with db.execute(query, (OrderStatus.NEW.value,)) as cursor:
                 rows = await cursor.fetchall()
@@ -54,10 +54,10 @@ class OrderService:
         try:
             db = await self._get_db_connection()
             query = """
-                SELECT ro.*, u.user_name, u.user_link
-                FROM request_order ro
-                JOIN users u ON ro.ID_user = u.ID
-                WHERE ro.ID_order = ?
+                SELECT o.*, u.user_name, u.user_link
+                FROM order o
+                JOIN users u ON o.ID_user = u.ID
+                WHERE o.ID_order = ?
             """
             async with db.execute(query, (order_id,)) as cursor:
                 if row := await cursor.fetchone():
@@ -77,12 +77,12 @@ class OrderService:
             db = await self._get_db_connection()
             
             # Generate unique order ID
-            async with db.execute("SELECT MAX(ID_order) FROM request_order") as cursor:
+            async with db.execute("SELECT MAX(ID_order) FROM order") as cursor:
                 last_id = await cursor.fetchone()
                 new_id = f"{(int(last_id[0] or 0) + 1):06d}"
 
             query = """
-                INSERT INTO request_order (
+                INSERT INTO order (
                     ID_order, ID_user, subject, type_work,
                     order_details, status, created_at
                 ) VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -125,7 +125,7 @@ class OrderService:
             db = await self._get_db_connection()
             current_time = datetime.now().isoformat()
             query = """
-                UPDATE request_order 
+                UPDATE order 
                 SET status = ?, ID_worker = ?, updated_at = ?
                 WHERE ID_order = ?
             """
@@ -154,7 +154,7 @@ class OrderService:
             db = await self._get_db_connection()
             current_time = datetime.now().isoformat()
             query = """
-                UPDATE request_order 
+                UPDATE order 
                 SET status = ?, completed_at = ?, updated_at = ?
                 WHERE ID_order = ?
             """

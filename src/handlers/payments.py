@@ -146,7 +146,7 @@ async def notify_admin_about_payment(callback: CallbackQuery) -> None:
         order_id = str(callback.data.split('_', 1)[1])  # Витяг номера замовлення для оплати
 
         # Тепер передаємо order_id як параметр
-        order = await payment_service.get_unpaid_orders(order_id=order_id)
+        order = await payment_service.get_unpaid_orders(order_id=order_id, status=0)
 
         money = 1 #order.price - order.paid
 
@@ -171,3 +171,38 @@ async def notify_admin_about_payment(callback: CallbackQuery) -> None:
     except Exception as e:
         logger.error(f"Помилка при відправці повідомлення адміністратору для підтвердження оплати: {e}")
         await callback.answer("Щось пішло не так. Спробуйте ще раз або зверніться в підтримку командою /support.", show_alert=True)
+
+@payments_router.callback_query(F.data.startswith("confirm_"))
+async def confirm_pay(callback: CallbackQuery) -> None:
+    try:
+        await callback.answer()
+
+        # Витяг id замовлення з callback запиту  
+        order_id = callback.data.split('_', 1)[1]
+
+        # Створення екземпляра сервісу
+        payment_service = PaymentService()
+
+        # Отримання замовлення
+        order = await payment_service.get_unpaid_orders(order_id=order_id, status=(0, 1))
+        if not order:
+            await callback.message.answer(f"Замовлення {order_id} не знайдено")
+            return
+
+        # Позначення як оплачене
+        success = await payment_service.mark_confirm_pay(order_id=order_id)
+
+        if success == True:
+            logger.info(f"Замовлення {order_id} оплачено.")
+            await callback.message.answer(f"Замовлення {order_id} оплачено.")  # Повідомлення адміну
+
+            await callback.bot.send_message(
+                chat_id=order.ID_user, 
+                text=f"Ваше замовлення {order_id} було успішно оплачено."  # Повідомлення користувачу
+            )
+        else:
+            await callback.message.answer(f"Не вдалося оновити статус замовлення {order_id}.")
+
+    except Exception as e:
+        logger.error(f"Помилка при підтвердженні оплати замовлення {order_id}: {e}")
+        await callback.message.answer("Сталася помилка під час обробки платежу.")
