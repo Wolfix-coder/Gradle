@@ -1,15 +1,17 @@
 import aiosqlite
 from aiogram import Router, types, F
+
 from aiogram.filters import Command
 from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
-from aiogram.filters.callback_data import CallbackData
-from aiogram.types.callback_query import CallbackQuery
-from aiogram.types import CallbackQuery, Message, ReplyKeyboardMarkup, KeyboardButton, ContentType, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, ContentType
 from aiogram.fsm.context import FSMContext
-from services.database import DatabaseService
+
+
+from services.database_service import DatabaseService
 from states.user_states import UserState
 from utils.validators import validate_input, validate_course
 from utils.logging import logger
+
 from text import support_url
 from config import Config
 
@@ -20,6 +22,8 @@ MAX_GROUP_LENGTH = 10
 ALLOWED_COURSES = ['1', '2', '3', '4']
 
 router = Router()
+
+database_service = DatabaseService()
 
 @router.message(Command("start"))
 async def cmd_start(message: types.Message):
@@ -44,7 +48,7 @@ async def handle_contact(message: types.Message, state: FSMContext):
         contact = message.contact
         user = message.from_user
 
-        if await DatabaseService.check_user_exists(user.id):
+        if await database_service.get_by_id('users', 'ID', 'user.id'):
             help_markup = ReplyKeyboardBuilder()
             help_markup.row(types.KeyboardButton(text="Допомога"))
             await message.answer(
@@ -163,10 +167,10 @@ async def get_course(message: types.Message, state: FSMContext):
     await state.update_data(course=message.text)
     
     groups = {
-        "1": ["ПК-241", "ПК-242", "КС-241", "ОМ-241", "РА-241", "РА-242", "АВ-241", "АП-241"],
-        "2": ["ПК-231", "ПК-232", "КС-231", "ОМ-231", "РА-231", "РА-232", "АВ-231", "АП-231"],
-        "3": ["ПК-221", "ПК-222", "КС-221", "ОМ-221", "РА-221", "РА-222", "АВ-221", "АП-221"],
-        "4": ["ПК-211", "ПК-212", "КС-211", "ОМ-211", "РА-211", "РА-212", "АВ-211", "АП-211"]
+        "1": ["ПК-251", "ПК-252", "КС-251", "ОМ-251", "РА-251", "РА-252", "АВ-251", "АП-251"],
+        "2": ["ПК-241", "ПК-242", "КС-241", "ОМ-241", "РА-241", "РА-242", "АВ-241", "АП-241"],
+        "3": ["ПК-231", "ПК-232", "КС-231", "ОМ-231", "РА-231", "РА-232", "АВ-231", "АП-231"],
+        "4": ["ПК-221", "ПК-222", "КС-221", "ОМ-221", "РА-221", "РА-222", "АВ-221", "АП-221"]
     }
     
     group_markup = ReplyKeyboardBuilder()

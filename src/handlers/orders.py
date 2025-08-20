@@ -9,23 +9,24 @@ from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.exceptions import TelegramBadRequest
 
-from utils.decorators import require_admin
-from utils.keyboards import get_worker_order_keyboard, subject_keyboard, type_work_keyboard
+from model.order import OrderStatus
+from services.database_service import DatabaseService
 from services.order_service import OrderService
 from states.order_states import OrderStates
-from services.database import DatabaseService
-from model.order import OrderStatus, Order
 from utils.logging import logger
-from config import Config
-from text import type_work_text
+from utils.decorators import require_admin
+from utils.keyboards import get_worker_order_keyboard, subject_keyboard, type_work_keyboard
 from utils.validators import validate_input
 
+from config import Config
+from text import type_work_text
 
 # Створюємо роутер
 users_orders_router = Router()
 admin_orders_router = Router()
 
 # Ініціалізуємо сервіс
+database_service = DatabaseService()
 order_service = OrderService()
 
 
@@ -34,7 +35,7 @@ order_service = OrderService()
 async def show_new_orders(callback: CallbackQuery) -> None:
     """Показує список нових замовлень."""
     try:
-        orders = await order_service.get_new_orders()
+        orders = await database_service.get_all_by_field('order',)
         
         if not orders:
             keyboard = InlineKeyboardBuilder()
@@ -94,9 +95,12 @@ async def take_order(callback: CallbackQuery) -> None:
         order_id = callback.data.split('_', 2)[2] # Витяг номер замовлення
         worker_id = callback.from_user.id # Витяг ID працівника який натиснув на кнопку
         worker_username = callback.from_user.username or 'без_імені' # Витяг ім'я працівника
+
+        # Створюємо екземпляр класу DatabaseService
+        database_service = DatabaseService()
         
         # Отримуємо замовлення та перевіряємо його статус
-        order = await order_service.get_order(order_id)
+        order = await database_service.get_by_id(order_id)
         
         if not order:
             logger.warning(f"Замовлення {order_id} не знайдено при спробі взяття")
@@ -108,6 +112,9 @@ async def take_order(callback: CallbackQuery) -> None:
             logger.info(f"Спроба взяти вже взяте замовлення {order_id} користувачем {worker_id}")
             await callback.answer("Це замовлення вже взято іншим виконавцем.", show_alert=True)
             return
+        
+        # Створюємо екземпляр класу OrderService
+        order_service = OrderService()
         
         # Оновлюємо статус замовлення через сервіс
         success = await order_service.in_progress_order(
@@ -382,7 +389,7 @@ async def finish_sending_work(callback: CallbackQuery, state: FSMContext) -> Non
         messages = data.get("messages", [])
         
         # Отримуємо інформацію про замовлення
-        order = await order_service.get_order(order_id)
+        order = await database_service.get_by_id('request_order', 'ID_order', order_id)
             
         if not order:
             await callback.answer("Замовлення не знайдено", show_alert=True)
@@ -438,27 +445,6 @@ async def finish_sending_work(callback: CallbackQuery, state: FSMContext) -> Non
             except Exception as e:
                 logger.error(f"Помилка при надсиланні файлу #{i+1} типу {file['type']}: {e}")
                 send_errors.append(f"файл #{i+1} ({file['type']})")
-        
-        # # # Оновлюємо статус замовлення
-        # # success = await order_service.complete_order(order_id)
-        
-        # if success and not send_errors:
-        #     # Повідомляємо адміністратора про успішну відправку
-        #     await callback.message.edit_text(
-        #         f"✅ Всі матеріали успішно відправлено клієнту.\n"
-        #         f"Замовлення #{order_id} позначено як виконане."
-        #     )
-        # elif success and send_errors:
-        #     await callback.message.edit_text(
-        #         f"⚠️ Деякі матеріали не вдалося відправити клієнту: {', '.join(send_errors)}.\n"
-        #         f"Замовлення #{order_id} позначено як виконане."
-        #     )
-        # else:
-        #     await callback.message.edit_text(
-        #         f"⚠️ Виникли проблеми:\n"
-        #         f"- {'Деякі матеріали не вдалося відправити: ' + ', '.join(send_errors) if send_errors else 'Матеріали відправлено'}\n"
-        #         f"- Помилка при оновленні статусу замовлення"
-        #     )
 
         try:
             keyboard = InlineKeyboardBuilder()
@@ -504,13 +490,13 @@ async def complete_order(callback: CallbackQuery, state: FSMContext) -> None:
     """Позначає замовлення як виконане."""
     try:
         order_id = str(callback.data.split("_")[2])
-
+        
         # Отримуємо інформацію про замовлення
-        order = await order_service.get_order(order_id)
+        order = await database_service.get_by_id('request_order', 'ID_order', order_id)
 
         worker_id = order.ID_worker
         client_id = order.ID_user
-        
+
         await order_service.complete_order(order_id)
         
         keyboard = InlineKeyboardBuilder()
@@ -542,7 +528,7 @@ async def complete_order(callback: CallbackQuery, state: FSMContext) -> None:
 @users_orders_router.message(Command("order"))
 async def cmd_order(message: types.Message):
     try:
-        if not await DatabaseService.check_user_exists(message.from_user.id):
+        if not await database_service.get_by_id('users', 'ID', message.from_user.id):
             await message.answer("Спочатку потрібно зареєструватися. Використайте команду /start")
             return
             
@@ -621,6 +607,9 @@ async def process_details(message: Message, state: FSMContext):
             "subject": data["subject"],
             "type_work": data["type_work"],
         }
+
+        # Створюємо екземпляр класу OrderService
+        order_service = OrderService() 
         
         # Використовуємо сервіс для створення замовлення та відправки повідомлення адміну
         new_id = await order_service.process_new_order(
@@ -631,8 +620,8 @@ async def process_details(message: Message, state: FSMContext):
             bot=message.bot
         )
         
-        if not new_id:
-            raise ValueError("Не вдалося створити замовлення")
+        # if not new_id:
+        #     raise ValueError("Не вдалося створити замовлення")
 
         await message.answer("Ваше замовлення успішно створено та відправлено на обробку!")
         await state.clear()
@@ -641,4 +630,33 @@ async def process_details(message: Message, state: FSMContext):
         logger.error(f"Помилка в process_details: {e}")
         await message.answer("Виникла помилка при створенні замовлення. Спробуйте пізніше")
         await state.clear()
+
+# async def get_orders_with_users(self, status: str) -> List[Dict]: # type: ignore
+#         """
+#         Отримати замовлення разом з даними користувачів
+    
+#         Args:
+#             status: str - статус замовлень ('pending', 'completed', etc.)
+    
+#         Returns:
+#             List[Dict] - список замовлень з даними користувачів
+#         """
+    
+#         # 1. Отримуємо всі замовлення по статусу
+#         orders = await self.get_orders_with_users()
+    
+#         # 2. Для кожного замовлення додаємо дані користувача
+#         for order in orders:
+#             user = await self.get_by_id('users', 'ID', order['ID_user'])
+        
+#             # Додаємо дані користувача до замовлення
+#             if user:
+#                 order['user_name'] = user['user_name']
+#                 order['user_link'] = user['user_link']
+#             else:
+#                 # Якщо користувача не знайдено
+#                 order['user_name'] = None
+#                 order['user_link'] = None
+    
+#         return orders
 

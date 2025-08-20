@@ -25,51 +25,6 @@ class OrderService:
             logger.error(f"Error creating database connection: {e}")
             raise
 
-
-    async def get_new_orders(self) -> List[Order]:
-        """Retrieves all new orders with associated user information."""
-        db = None
-        try:
-            db = await self._get_db_connection()
-            query = """
-                SELECT o.*, u.user_name, u.user_link
-                FROM order o
-                JOIN users u ON o.ID_user = u.ID
-                WHERE o.status = ?
-                ORDER BY o.created_at DESC
-            """
-            async with db.execute(query, (OrderStatus.NEW.value,)) as cursor:
-                rows = await cursor.fetchall()
-                return [Order(**dict(row)) for row in rows]
-        except Exception as e:
-            logger.error(f"Error getting new orders: {e}")
-            raise
-        finally:
-            if db:
-                await db.close()
-
-    async def get_order(self, order_id: str) -> Order:
-        """Отримує певне замовлення за ідентифікатором з інформацією про користувача."""
-        db = None
-        try:
-            db = await self._get_db_connection()
-            query = """
-                SELECT o.*, u.user_name, u.user_link
-                FROM order o
-                JOIN users u ON o.ID_user = u.ID
-                WHERE o.ID_order = ?
-            """
-            async with db.execute(query, (order_id,)) as cursor:
-                if row := await cursor.fetchone():
-                    return Order(**dict(row))
-                return None
-        except Exception as e:
-            logger.error(f"Error getting order {order_id}: {e}")
-            raise
-        finally:
-            if db:
-                await db.close()
-
     async def create_order(self, order_data: Dict[str, Any]) -> Optional[str]:
         """Creates a new order and returns its ID."""
         db = None

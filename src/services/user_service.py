@@ -1,5 +1,5 @@
 from model.user import UserModel
-from .database import DBConnection
+from .database_service import DatabaseService
 import logging
 import aiosqlite
 from typing import Optional
@@ -8,11 +8,11 @@ from utils.logging import logger
 
 class UserService:
     def __init__(self):
-        self.db = DBConnection()
+        self.db = DatabaseService()
 
     async def get_user(self, user_id: int) -> UserModel:
         try:
-            async with self.db.connection() as conn:
+            async with self.db._get_db_connection() as conn:
                 query = "SELECT * FROM users WHERE ID = ?"
                 async with conn.execute(query, (user_id,)) as cursor:
                     user_data = await cursor.fetchone()
@@ -32,7 +32,7 @@ class UserService:
 
     async def create_user(self, user: UserModel) -> bool:
         try:
-            async with self.db.connection() as conn:
+            async with self.db._get_db_connection() as conn:
                 query = """
                     INSERT INTO users (ID, user_name, user_link, created_at)
                     VALUES (?, ?, ?, ?)

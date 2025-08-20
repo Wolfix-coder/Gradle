@@ -15,7 +15,7 @@ from handlers.statistics import statistics_router
 from handlers.basic import router as basic_router
 from handlers.users import router as users_router
 from handlers.orders import users_orders_router
-from services.database import DatabaseService
+from services.database_service import DBCreator
 from utils.logging import logger
 from config import Config
 
@@ -48,7 +48,7 @@ class BotRunner:
     async def init_services(self):
         """Ініціалізація всіх сервісів."""
         try:
-            if await DatabaseService.create_tables() == True:
+            if await DBCreator.create_tables() == True:
                 logger.info("Таблиці бази даних успішно створені")
             else:
                 logger.error(f"Помилка при створені створені БД")
