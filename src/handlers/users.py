@@ -48,7 +48,7 @@ async def handle_contact(message: types.Message, state: FSMContext):
         contact = message.contact
         user = message.from_user
 
-        if await database_service.get_by_id('users', 'ID', 'user.id'):
+        if await database_service.get_by_id('user_data', 'ID', 'user.id'):
             help_markup = ReplyKeyboardBuilder()
             help_markup.row(types.KeyboardButton(text="Допомога"))
             await message.answer(
@@ -197,7 +197,7 @@ async def get_group(message: Message, state: FSMContext):
         
         async with aiosqlite.connect(Config.DATABASE_PATH) as db:
             await db.execute(
-                '''INSERT INTO users (
+                '''INSERT INTO user_data (
                     ID, user_name, user_link, real_full_name, for_father,
                     education, course, edu_group, phone_number, language_code
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',

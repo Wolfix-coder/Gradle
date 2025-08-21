@@ -7,6 +7,7 @@ from utils.validators import _validate_table_column
 from config import Config
 
 class DBCreator:
+    @staticmethod
     async def create_tables() -> bool:
         try:
             async with aiosqlite.connect(Config.DATABASE_PATH) as db:
@@ -64,10 +65,10 @@ class DBCreator:
                         paid REAL,
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                         paid_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    )
-                """)
+                        )
+                    """)
                 
-                await db.commit()
+                    await db.commit()
                 return True
             except aiosqlite.Error as e:
                     logger.error(f"Error create table payments: {e}")

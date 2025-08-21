@@ -5,7 +5,7 @@ from aiogram.filters import Command
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from model.payments import Payments
-from services.database import DatabaseService
+from services.database_service import DatabaseService
 from services.payment_service import PaymentService
 from utils.decorators import require_admin
 from utils.keyboards import get_user_pay_keyboard
@@ -16,6 +16,10 @@ from text import help_text
 
 # Створюємо роутер
 payments_router = Router()
+
+# Створюємо об'єкти сервісів
+database_service = DatabaseService()
+payment_service = PaymentService()
 
 # Команда /pay для звичайного користувача
 @payments_router.message(Command("pay"))
@@ -91,7 +95,6 @@ async def pay_order(callback: CallbackQuery) -> None:
     try:
         await callback.answer()
 
-        payment_service = PaymentService()
         order_id = str(callback.data.split('_', 2)[2])  # Витяг номера замовлення для оплати
 
         # Тепер передаємо order_id як параметр
@@ -179,9 +182,6 @@ async def confirm_pay(callback: CallbackQuery) -> None:
 
         # Витяг id замовлення з callback запиту  
         order_id = callback.data.split('_', 1)[1]
-
-        # Створення екземпляра сервісу
-        payment_service = PaymentService()
 
         # Отримання замовлення
         order = await payment_service.get_unpaid_orders(order_id=order_id, status=(0, 1))

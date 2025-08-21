@@ -6,24 +6,12 @@ from typing import List, Optional, Union
 from config import Config
 
 from model.payments import Payments
-from services.database import DatabaseService
+from services.database_service import DatabaseService
 from utils.logging import logger
 
+database_service = DatabaseService()
+
 class PaymentService:
-    
-    def __init__(self):
-        self.db_path = Config.DATABASE_PATH
-
-    async def _get_db_connection(self):
-        """Підключення до БД"""
-        try:
-            db = await aiosqlite.connect(self.db_path)
-            db.row_factory = aiosqlite.Row
-            return db
-        except Exception as e:
-            logger.error(f"Error creating database connection: {e}")
-            raise
-
     async def get_unpaid_orders(self, status: int, order_id: Optional[int] = None) -> Union[List[Payments], Payments, None]:
         """
         Отримання не оплачених замовлень
@@ -39,7 +27,7 @@ class PaymentService:
         """
         db = None
         try:
-            db = await self._get_db_connection()
+            db = await database_service._get_db_connection()
             
             if order_id is not None:
                 # Отримання конкретного замовлення
@@ -76,7 +64,7 @@ class PaymentService:
         """Змінення статусу оплати на ОПЛАЧЕНО (1)"""
 
         try:
-            async with await self._get_db_connection() as db:
+            async with await database_service._get_db_connection() as db:
                 current_time = datetime.now().isoformat()
                 query = """
                 UPDATE orders SET status = ?, paid_at = ?

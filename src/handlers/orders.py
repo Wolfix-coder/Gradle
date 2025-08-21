@@ -172,7 +172,7 @@ async def get_worker_orders(worker_id: int) -> list:
                     u.user_name,
                     u.user_link
                 FROM order o
-                LEFT JOIN users u ON o.ID_user = u.ID
+                LEFT JOIN user_data u ON o.ID_user = u.ID
                 WHERE o.ID_worker = ? 
                 AND o.status IN (?, ?)
                 ORDER BY 
@@ -528,7 +528,7 @@ async def complete_order(callback: CallbackQuery, state: FSMContext) -> None:
 @users_orders_router.message(Command("order"))
 async def cmd_order(message: types.Message):
     try:
-        if not await database_service.get_by_id('users', 'ID', message.from_user.id):
+        if not await database_service.get_by_id('user_data', 'ID', message.from_user.id):
             await message.answer("Спочатку потрібно зареєструватися. Використайте команду /start")
             return
             
@@ -647,7 +647,7 @@ async def process_details(message: Message, state: FSMContext):
     
 #         # 2. Для кожного замовлення додаємо дані користувача
 #         for order in orders:
-#             user = await self.get_by_id('users', 'ID', order['ID_user'])
+#             user = await self.get_by_id('user_data', 'ID', order['ID_user'])
         
 #             # Додаємо дані користувача до замовлення
 #             if user:
