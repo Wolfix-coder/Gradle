@@ -1,6 +1,8 @@
 import aiosqlite
 
 from typing import Optional, Dict, Any, List
+
+from model.order import OrderStatus
 from utils.logging import logger
 from utils.validators import _validate_table_column
 
@@ -150,3 +152,60 @@ class DatabaseService:
         finally:
             if db:
                 await db.close()
+    
+    async def get_worker_statistics(self, worker_id: int) -> Dict:
+        """
+        Отримує статистику для конкретного працівника.
+        
+        Args:
+            worker_id (int): ID працівника
+            
+        Returns:
+            Dict: Словник зі статистикою, що містить:
+                - total_completed: загальна кількість виконаних замовлень
+                - active_orders: кількість активних замовлень
+                - top_subjects: список кортежів (предмет, кількість замовлень)
+        """
+        try:
+            async with aiosqlite.connect(self.db_path) as db:
+                db.row_factory = aiosqlite.Row
+                
+                # Отримуємо кількість виконаних замовлень
+                async with db.execute("""
+                    SELECT COUNT(*) as count 
+                    FROM order_request 
+                    WHERE ID_worker = ? AND status = ?
+                """, (worker_id, OrderStatus.COMPLETED.value)) as cursor:
+                    completed = await cursor.fetchone()
+                    total_completed = completed['count']
+
+                # Отримуємо кількість активних замовлень
+                async with db.execute("""
+                    SELECT COUNT(*) as count 
+                    FROM order_request
+                    WHERE ID_worker = ? AND status = ?
+                """, (worker_id, OrderStatus.IN_PROGRESS.value)) as cursor:
+                    active = await cursor.fetchone()
+                    active_orders = active['count']
+
+                # Отримуємо топ предметів
+                async with db.execute("""
+                    SELECT subject, COUNT(*) as count 
+                    FROM order_request
+                    WHERE ID_worker = ? AND status = ?
+                    GROUP BY subject 
+                    ORDER BY count DESC 
+                    LIMIT 5
+                """, (worker_id, OrderStatus.COMPLETED.value)) as cursor:
+                    subjects = await cursor.fetchall()
+                    top_subjects = [(row['subject'], row['count']) for row in subjects]
+
+                return {
+                    'total_completed': total_completed,
+                    'active_orders': active_orders,
+                    'top_subjects': top_subjects
+                }
+                
+        except Exception as e:
+            logger.error(f"Помилка при отриманні статистики для працівника {worker_id}: {e}")
+            raise

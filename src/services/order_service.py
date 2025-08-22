@@ -1,12 +1,12 @@
 import aiosqlite
-import traceback
-
-from typing import List, Optional, Dict, Any
 from datetime import datetime
+
 from aiogram import Bot
+from typing import Optional, Dict, Any
 
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from model.order import Order, OrderStatus
+
+from model.order import OrderStatus
 
 from config import Config
 from utils.logging import logger
@@ -202,3 +202,48 @@ class OrderService:
         except Exception as e:
             logger.error(f"Error sending admin notification: {e}")
             raise
+
+    async def get_worker_orders(worker_id: int) -> list:
+        """
+            Отримує всі замовлення працівника з бази даних.
+
+            Args:
+                worker_id (int): ID працівника
+
+            Returns:
+                list: Список замовлень
+        """
+        try:
+            async with aiosqlite.connect(Config.DATABASE_PATH) as db:
+                db.row_factory = aiosqlite.Row
+                async with db.execute("""
+                    SELECT 
+                        o.ID_order,
+                        o.subject,
+                        o.type_work,
+                        o.order_details,
+                        o.created_at,
+                        o.status,
+                        u.user_name,
+                        u.user_link
+                    FROM order_request o
+                    LEFT JOIN user_data u ON o.ID_user = u.ID
+                    WHERE o.ID_worker = ? 
+                    AND o.status IN (?, ?)
+                    ORDER BY 
+                        CASE o.status 
+                            WHEN ? THEN 1 
+                            WHEN ? THEN 2 
+                        END,
+                        o.created_at DESC
+                """, (worker_id, 
+                      OrderStatus.IN_PROGRESS.value,
+                      OrderStatus.NEW.value,
+                      OrderStatus.IN_PROGRESS.value,
+                      OrderStatus.NEW.value)) as cursor:
+                    return [dict(row) for row in await cursor.fetchall()]
+        except Exception as e:
+            logger.error(f"Помилка отримання замовлень воркера: {e}")
+            return []
+
+    
