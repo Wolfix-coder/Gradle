@@ -508,6 +508,216 @@ async def complete_order(callback: CallbackQuery, state: FSMContext) -> None:
         logger.error(f"Помилка при завершенні замовлення: {e}")
         await callback.answer("Помилка при завершенні замовлення", show_alert=True)
 
+@users_orders_router.callback_query(F.data.startswith("fix_work_"))
+async def fix_work(callback: CallbackQuery, state: FSMContext) -> None:
+    """Ініціює процес відправки правок воркеру."""
+    try:
+        order_id = str(callback.data.split("_")[2])
+        await state.set_state(OrderStates.AWAITING_CORRECT)
+        await state.update_data(order_id=order_id, files=[], messages=[])
+        
+        keyboard = InlineKeyboardBuilder()
+        keyboard.button(text="✅ Завершити відправку", callback_data=f"finish_correct_{order_id}")
+        keyboard.button(text="❌ Скасувати", callback_data=f"cancel_correct_{order_id}")
+        
+        await callback.message.edit_text(
+            "📤 Надішліть файли, фото, відео або текстові повідомлення, що стосуються правок данного замовлення.\n"
+            "Натисніть 'Завершити відправку', коли закінчите",
+            reply_markup=keyboard.as_markup()
+        )
+        
+    except Exception as e:
+        logger.error(f"Помилка при ініціації відправки правок: {e}")
+        await callback.answer("Помилка при початку процесу відправки", show_alert=True)
+
+@users_orders_router.message(OrderStates.AWAITING_CORRECT, F.text)
+async def handle_text_for_worker_correct(message: Message, state: FSMContext) -> None:
+    """Обробляє текстові повідомлення для відправки воркеру."""
+    try:
+        data = await state.get_data()
+        messages = data.get("messages", [])
+        messages.append({"type": "text", "content": message.text})
+        await state.update_data(messages=messages)
+        
+        await message.answer("✅ Текстове повідомлення додано до черги відправки")
+    except Exception as e:
+        logger.error(f"Помилка при обробці текстового повідомлення: {e}")
+        await message.answer("❌ Помилка при додаванні повідомлення")
+
+@admin_orders_router.message(OrderStates.AWAITING_CORRECT, F.photo)
+async def handle_photo_for_worker_correct(message: Message, state: FSMContext) -> None:
+    """Обробляє фото для відправки воркеру."""
+    try:
+        data = await state.get_data()
+        files = data.get("files", [])
+        
+        photo = message.photo[-1]  # Беремо найбільшу версію фото
+        file_id = photo.file_id
+        
+        caption = message.caption if message.caption else ""
+        
+        files.append({"type": "photo", "file_id": file_id, "caption": caption})
+        await state.update_data(files=files)
+        
+        await message.answer("✅ Фото додано до черги відправки")
+    except Exception as e:
+        logger.error(f"Помилка при обробці фото: {e}")
+        await message.answer("❌ Помилка при додаванні фото")
+
+@admin_orders_router.message(OrderStates.AWAITING_CORRECT, F.document)
+async def handle_document_for_worker_correct(message: Message, state: FSMContext) -> None:
+    """Обробляє документи для відправки воркеру."""
+    try:
+        data = await state.get_data()
+        files = data.get("files", [])
+        
+        file_id = message.document.file_id
+        caption = message.caption if message.caption else ""
+        
+        files.append({"type": "document", "file_id": file_id, "caption": caption})
+        await state.update_data(files=files)
+        
+        await message.answer("✅ Документ додано до черги відправки")
+    except Exception as e:
+        logger.error(f"Помилка при обробці документа: {e}")
+        await message.answer("❌ Помилка при додаванні документа")
+
+@admin_orders_router.message(OrderStates.AWAITING_CORRECT, F.video)
+async def handle_video_for_worker_correct(message: Message, state: FSMContext) -> None:
+    """Обробляє відео для відправки воркеру."""
+    try:
+        data = await state.get_data()
+        files = data.get("files", [])
+        
+        file_id = message.video.file_id
+        caption = message.caption if message.caption else ""
+        
+        files.append({"type": "video", "file_id": file_id, "caption": caption})
+        await state.update_data(files=files)
+        
+        await message.answer("✅ Відео додано до черги відправки")
+    except Exception as e:
+        logger.error(f"Помилка при обробці відео: {e}")
+        await message.answer("❌ Помилка при додаванні відео")
+
+@admin_orders_router.message(OrderStates.AWAITING_CORRECT, F.voice)
+async def handle_voice_for_worker_correct(message: Message, state: FSMContext) -> None:
+    """Обробляє голосові повідомлення для відправки воркеру."""
+    try:
+        data = await state.get_data()
+        files = data.get("files", [])
+        
+        file_id = message.voice.file_id
+        
+        files.append({"type": "voice", "file_id": file_id})
+        await state.update_data(files=files)
+        
+        await message.answer("✅ Голосове повідомлення додано до черги відправки")
+    except Exception as e:
+        logger.error(f"Помилка при обробці голосового повідомлення: {e}")
+        await message.answer("❌ Помилка при додаванні голосового повідомлення")
+        
+@users_orders_router.callback_query(F.data.startswith("finish_correct_"))
+async def finish_sending_correct_work(callback: CallbackQuery, state: FSMContext) -> None:
+    """Завершує процес відправки роботи та надсилає всі файли клієнту."""
+    try:
+        order_id = callback.data.split("_")[2]
+        data = await state.get_data()
+        files = data.get("files", [])
+        messages = data.get("messages", [])
+        
+        # Отримуємо інформацію про замовлення
+        order = await database_service.get_by_id('order_request', 'ID_order', order_id)
+            
+        if not order:
+            await callback.answer("Замовлення не знайдено", show_alert=True)
+            await state.clear()
+            return
+        
+        client_id = order['ID_user']
+        worker_id = order["ID_worker"]
+        send_errors = []
+        
+        # Надсилаємо повідомлення клієнту про виконану роботу
+        try:
+            await callback.bot.send_message(
+                worker_id,
+                f"⚠️⚠️⚠️ Замовлення #{order_id} знову правки!\n\n"
+                f"Нижче ви отримаєте всі коментарі від клієнта."
+            )
+        except Exception as e:
+            logger.error(f"Помилка при надсиланні початкового повідомлення: {e}")
+            send_errors.append("початкове повідомлення")
+
+            await callback.bot.send_message(
+                client_id,
+                f"Правки до замовлення #{order_id} не відправлено спробуйте ще раз трохи пізніше. \n"
+                f"Або зверніться до служби підтримки /support .")
+        
+        # Надсилаємо текстові повідомлення
+        for i, msg in enumerate(messages):
+            if msg["type"] == "text":
+                try:
+                    await callback.bot.send_message(worker_id, msg["content"])
+                except Exception as e:
+                    logger.error(f"Помилка при надсиланні текстового повідомлення #{i+1}: {e}")
+                    send_errors.append(f"текстове повідомлення #{i+1}")
+        
+        # Надсилаємо файли
+        for i, file in enumerate(files):
+            try:
+                if file["type"] == "photo":
+                    await callback.bot.send_photo(
+                        worker_id, 
+                        file["file_id"],
+                        caption=file["caption"] if file["caption"] else None
+                    )
+                elif file["type"] == "document":
+                    await callback.bot.send_document(
+                        worker_id, 
+                        file["file_id"],
+                        caption=file["caption"] if file["caption"] else None
+                    )
+                elif file["type"] == "video":
+                    await callback.bot.send_video(
+                        worker_id, 
+                        file["file_id"],
+                        caption=file["caption"] if file["caption"] else None
+                    )
+                elif file["type"] == "voice":
+                    await callback.bot.send_voice(worker_id, file["file_id"])
+            except Exception as e:
+                logger.error(f"Помилка при надсиланні файлу #{i+1} типу {file['type']}: {e}")
+                send_errors.append(f"файл #{i+1} ({file['type']})")
+
+        try:
+            keyboard = InlineKeyboardBuilder()
+            keyboard.button(text=" Відправити роботу ", callback_data=f"send_work_{order_id}")
+
+            await callback.bot.send_message(
+                client_id,
+                f"Правки до замовлення #{order_id} успішно відправлено.\n"
+                f"Трохи почекайте поки адміністратор виправить вашу роботу."
+            )
+
+            await callback.bot.send_message(
+                worker_id,
+                f"Відправити зкоректовану роботу до замовлення #{order_id}",
+                reply_markup=keyboard.as_markup()
+            )
+
+        except Exception as e:
+            logger.error(f"Помилка при надсиланні повідомлення підтвердження виконання роботи (463): {e}")
+            await callback.answer("Помилка при надсиланні повідомлення підтвердження виконання роботи", show_alert=True)
+        
+        # Очищаємо стан
+        await state.clear()
+        
+    except Exception as e:
+        logger.error(f"Помилка при завершенні відправки роботи: {e}")
+        await callback.answer("Помилка при відправці матеріалів клієнту", show_alert=True)
+        await state.clear()
+
 
 
 async def show_worker_orders_handler(callback: CallbackQuery) -> None:
