@@ -19,7 +19,7 @@ class Order:
     subject: str
     type_work: str
     order_details: str
-    status: OrderStatus = OrderStatus.NEW
+    status: int
     ID_worker: Optional[int] = None
     created_at: datetime = field(default_factory=datetime.now)
     taken_at: Optional[datetime] = None

@@ -32,12 +32,12 @@ class OrderService:
             db = await self._get_db_connection()
             
             # Generate unique order ID
-            async with db.execute("SELECT MAX(ID_order) FROM order") as cursor:
+            async with db.execute("SELECT MAX(ID_order) FROM order_request") as cursor:
                 last_id = await cursor.fetchone()
                 new_id = f"{(int(last_id[0] or 0) + 1):06d}"
 
             query = """
-                INSERT INTO order (
+                INSERT INTO order_request (
                     ID_order, ID_user, subject, type_work,
                     order_details, status, created_at
                 ) VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -80,7 +80,7 @@ class OrderService:
             db = await self._get_db_connection()
             current_time = datetime.now().isoformat()
             query = """
-                UPDATE order 
+                UPDATE order_request
                 SET status = ?, ID_worker = ?, updated_at = ?
                 WHERE ID_order = ?
             """
@@ -109,7 +109,7 @@ class OrderService:
             db = await self._get_db_connection()
             current_time = datetime.now().isoformat()
             query = """
-                UPDATE order 
+                UPDATE order_request
                 SET status = ?, completed_at = ?, updated_at = ?
                 WHERE ID_order = ?
             """

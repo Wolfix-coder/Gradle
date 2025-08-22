@@ -35,7 +35,7 @@ order_service = OrderService()
 async def show_new_orders(callback: CallbackQuery) -> None:
     """Показує список нових замовлень."""
     try:
-        orders = await database_service.get_all_by_field('order',)
+        orders = await database_service.get_all_by_field('order_request', 'status', 1)
         
         if not orders:
             keyboard = InlineKeyboardBuilder()
@@ -50,17 +50,17 @@ async def show_new_orders(callback: CallbackQuery) -> None:
 
         for order in orders:
             keyboard = InlineKeyboardBuilder()
-            keyboard.button(text="✅ Взяти замовлення", callback_data=f"take_order_{order.ID_order}")
+            keyboard.button(text="✅ Взяти замовлення", callback_data=f"take_order_{order['ID_order']}")
             keyboard.button(text="🔙 Назад", callback_data="back_to_admin")
             keyboard.adjust(1)
 
             order_text = (
-                f"📌 Замовлення #{order.ID_order}\n"
-                f"📚 Предмет: {order.subject}\n"
-                f"📝 Тип роботи: {order.type_work}\n"
-                f"📋 Деталі: {order.order_details}\n"
-                f"👤 Замовник: @{order.user_link}\n"
-                f"📅 Створено: {order.created_at}"
+                f"📌 Замовлення #{order['ID_order']}\n"
+                f"📚 Предмет: {order['subject']}\n"
+                f"📝 Тип роботи: {order['type_work']}\n"
+                f"📋 Деталі: {order['order_details']}\n"
+                f"👤 Замовник: @{order['user_link']}\n"
+                f"📅 Створено: {order['created_at']}"
             )
 
             await callback.message.answer(order_text, reply_markup=keyboard.as_markup())
@@ -95,26 +95,20 @@ async def take_order(callback: CallbackQuery) -> None:
         order_id = callback.data.split('_', 2)[2] # Витяг номер замовлення
         worker_id = callback.from_user.id # Витяг ID працівника який натиснув на кнопку
         worker_username = callback.from_user.username or 'без_імені' # Витяг ім'я працівника
-
-        # Створюємо екземпляр класу DatabaseService
-        database_service = DatabaseService()
         
         # Отримуємо замовлення та перевіряємо його статус
-        order = await database_service.get_by_id(order_id)
+        order = await database_service.get_by_id('order_request', 'ID_order', order_id)
         
         if not order:
             logger.warning(f"Замовлення {order_id} не знайдено при спробі взяття")
             await callback.answer("Замовлення не знайдено.", show_alert=True)
             return
             
-        if order.status != 1:
+        if order['status'] != 1:
             "Перевірка статусу замовлення"
             logger.info(f"Спроба взяти вже взяте замовлення {order_id} користувачем {worker_id}")
             await callback.answer("Це замовлення вже взято іншим виконавцем.", show_alert=True)
             return
-        
-        # Створюємо екземпляр класу OrderService
-        order_service = OrderService()
         
         # Оновлюємо статус замовлення через сервіс
         success = await order_service.in_progress_order(
@@ -171,7 +165,7 @@ async def get_worker_orders(worker_id: int) -> list:
                     o.status,
                     u.user_name,
                     u.user_link
-                FROM order o
+                FROM order_request o
                 LEFT JOIN user_data u ON o.ID_user = u.ID
                 WHERE o.ID_worker = ? 
                 AND o.status IN (?, ?)
@@ -389,14 +383,14 @@ async def finish_sending_work(callback: CallbackQuery, state: FSMContext) -> Non
         messages = data.get("messages", [])
         
         # Отримуємо інформацію про замовлення
-        order = await database_service.get_by_id('request_order', 'ID_order', order_id)
+        order = await database_service.get_by_id('order_request', 'ID_order', order_id)
             
         if not order:
             await callback.answer("Замовлення не знайдено", show_alert=True)
             await state.clear()
             return
         
-        client_id = order.ID_user
+        client_id = order['ID_user']
         send_errors = []
         
         # Надсилаємо повідомлення клієнту про виконану роботу
@@ -492,10 +486,10 @@ async def complete_order(callback: CallbackQuery, state: FSMContext) -> None:
         order_id = str(callback.data.split("_")[2])
         
         # Отримуємо інформацію про замовлення
-        order = await database_service.get_by_id('request_order', 'ID_order', order_id)
+        order = await database_service.get_by_id('order_request', 'ID_order', order_id)
 
-        worker_id = order.ID_worker
-        client_id = order.ID_user
+        worker_id = order['ID_worker']
+        client_id = order['ID_user']
 
         await order_service.complete_order(order_id)
         

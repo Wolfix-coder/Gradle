@@ -48,7 +48,7 @@ async def handle_contact(message: types.Message, state: FSMContext):
         contact = message.contact
         user = message.from_user
 
-        if await database_service.get_by_id('user_data', 'ID', 'user.id'):
+        if await database_service.get_by_id('user_data', 'ID', user.id):
             help_markup = ReplyKeyboardBuilder()
             help_markup.row(types.KeyboardButton(text="Допомога"))
             await message.answer(
