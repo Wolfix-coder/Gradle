@@ -6,7 +6,6 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
 from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, ContentType
 from aiogram.fsm.context import FSMContext
 
-
 from services.database_service import DatabaseService
 from states.user_states import UserState
 from utils.validators import validate_input, validate_course
@@ -21,11 +20,11 @@ MAX_COMMENT_LENGTH = 500
 MAX_GROUP_LENGTH = 10
 ALLOWED_COURSES = ['1', '2', '3', '4']
 
-router = Router()
+user_router = Router()
 
 database_service = DatabaseService()
 
-@router.message(Command("start"))
+@user_router.message(Command("start"))
 async def cmd_start(message: types.Message):
     try:
         phone_button = KeyboardButton(text="Надати номер телефону", request_contact=True)
@@ -42,7 +41,7 @@ async def cmd_start(message: types.Message):
         logger.error(f"Error in start command: {e}")
         await message.answer("Виникла помилка. Спробуйте пізніше.")
 
-@router.message(F.content_type == ContentType.CONTACT)
+@user_router.message(F.content_type == ContentType.CONTACT)
 async def handle_contact(message: types.Message, state: FSMContext):
     try:
         contact = message.contact
@@ -65,7 +64,7 @@ async def handle_contact(message: types.Message, state: FSMContext):
         logger.error(f"Error handling contact: {e}")
         await message.answer("Виникла помилка. Спробуйте пізніше.")
 
-@router.message(UserState.waiting_for_real_full_name)
+@user_router.message(UserState.waiting_for_real_full_name)
 async def get_full_name(message: Message, state: FSMContext):
     name = validate_input(message.text, MAX_NAME_LENGTH)
     if not name:
@@ -76,7 +75,7 @@ async def get_full_name(message: Message, state: FSMContext):
     await message.answer("Введіть своє прізвище.")
     await state.set_state(UserState.waiting_for_patronymic)
 
-@router.message(UserState.waiting_for_patronymic)
+@user_router.message(UserState.waiting_for_patronymic)
 async def get_patronymic(message: types.Message, state: FSMContext):
     patronymic = validate_input(message.text, MAX_NAME_LENGTH)
     if not patronymic:
@@ -95,7 +94,7 @@ async def get_patronymic(message: types.Message, state: FSMContext):
     )
     await state.set_state(UserState.waiting_for_education_place)
 
-@router.message(UserState.waiting_for_education_place)
+@user_router.message(UserState.waiting_for_education_place)
 async def get_education_place(message: types.Message, state: FSMContext):
     if message.text == "Інше":
         education_markup = ReplyKeyboardBuilder()
@@ -158,7 +157,7 @@ async def get_education_place(message: types.Message, state: FSMContext):
             reply_markup=education_markup.as_markup(resize_keyboard=True)
         )
 
-@router.message(UserState.waiting_for_course)
+@user_router.message(UserState.waiting_for_course)
 async def get_course(message: types.Message, state: FSMContext):
     if not validate_course(message.text):
         await message.answer("Невірний курс. Будь ласка, виберіть курс зі списку.")
@@ -184,7 +183,7 @@ async def get_course(message: types.Message, state: FSMContext):
     )
     await state.set_state(UserState.waiting_for_group)
 
-@router.message(UserState.waiting_for_group)
+@user_router.message(UserState.waiting_for_group)
 async def get_group(message: Message, state: FSMContext):
     try:
         group = validate_input(message.text, MAX_GROUP_LENGTH)

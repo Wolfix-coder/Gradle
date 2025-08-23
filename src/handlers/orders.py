@@ -18,14 +18,14 @@ from config import Config
 from text import type_work_text
 
 # Створюємо роутер
-users_orders_router = Router()
+user_orders_router = Router()
 admin_orders_router = Router()
 
 # Ініціалізуємо сервіс
 database_service = DatabaseService()
 order_service = OrderService()
 
-@users_orders_router.message(Command("order"))
+@user_orders_router.message(Command("order"))
 async def cmd_order(message: types.Message):
     try:
         if not await database_service.get_by_id('user_data', 'ID', message.from_user.id):
@@ -43,13 +43,13 @@ async def cmd_order(message: types.Message):
         logger.error(f"Error in order command: {e}")
         await message.answer("Виникла помилка. Спробуйте пізніше.")
 
-@users_orders_router.callback_query(F.data == "no")
+@user_orders_router.callback_query(F.data == "no")
 async def callback_no(query: CallbackQuery):
     await query.answer("Оформлення замовлення скасовано!")
     await query.message.delete()
     await query.message.answer("Введіть команду /help, щоб ознайомитися зі списком команд.")
 
-@users_orders_router.callback_query(F.data == "yes")
+@user_orders_router.callback_query(F.data == "yes")
 async def callback_yes(query: CallbackQuery, state: FSMContext):
     try:
         await query.answer("Оформлення замовлення розпочато!")
@@ -61,7 +61,7 @@ async def callback_yes(query: CallbackQuery, state: FSMContext):
         await query.message.answer("Виникла помилка. Спробуйте пізніше.")
         await state.clear()
 
-@users_orders_router.callback_query(OrderStates.waiting_for_type)
+@user_orders_router.callback_query(OrderStates.waiting_for_type)
 async def process_subject(callback: CallbackQuery, state: FSMContext):
     try:
         await state.update_data(subject=callback.data)
@@ -75,7 +75,7 @@ async def process_subject(callback: CallbackQuery, state: FSMContext):
         await callback.message.answer("Виникла помилка. Спробуйте пізніше.")
         await state.clear()
 
-@users_orders_router.callback_query(OrderStates.waiting_for_details)
+@user_orders_router.callback_query(OrderStates.waiting_for_details)
 async def process_type(callback: CallbackQuery, state: FSMContext):
     try:
         await state.update_data(type_work=callback.data)
@@ -88,7 +88,7 @@ async def process_type(callback: CallbackQuery, state: FSMContext):
         await callback.message.answer("Виникла помилка. Спробуйте пізніше.")
         await state.clear()
 
-@users_orders_router.message(OrderStates.waiting_for_comment)
+@user_orders_router.message(OrderStates.waiting_for_comment)
 async def process_details(message: Message, state: FSMContext):
     try:
         # Валідація коментаря
@@ -468,7 +468,7 @@ async def cancel_sending_work(callback: CallbackQuery, state: FSMContext) -> Non
         await callback.answer("Помилка при скасуванні відправки", show_alert=True)
         await state.clear()
         
-@users_orders_router.callback_query(F.data.startswith("complete_order_"))
+@user_orders_router.callback_query(F.data.startswith("complete_order_"))
 async def complete_order(callback: CallbackQuery, state: FSMContext) -> None:
     """Позначає замовлення як виконане."""
     try:
@@ -508,7 +508,7 @@ async def complete_order(callback: CallbackQuery, state: FSMContext) -> None:
         logger.error(f"Помилка при завершенні замовлення: {e}")
         await callback.answer("Помилка при завершенні замовлення", show_alert=True)
 
-@users_orders_router.callback_query(F.data.startswith("fix_work_"))
+@user_orders_router.callback_query(F.data.startswith("fix_work_"))
 async def fix_work(callback: CallbackQuery, state: FSMContext) -> None:
     """Ініціює процес відправки правок воркеру."""
     try:
@@ -530,7 +530,7 @@ async def fix_work(callback: CallbackQuery, state: FSMContext) -> None:
         logger.error(f"Помилка при ініціації відправки правок: {e}")
         await callback.answer("Помилка при початку процесу відправки", show_alert=True)
 
-@users_orders_router.message(OrderStates.AWAITING_CORRECT, F.text)
+@user_orders_router.message(OrderStates.AWAITING_CORRECT, F.text)
 async def handle_text_for_worker_correct(message: Message, state: FSMContext) -> None:
     """Обробляє текстові повідомлення для відправки воркеру."""
     try:
@@ -617,7 +617,7 @@ async def handle_voice_for_worker_correct(message: Message, state: FSMContext) -
         logger.error(f"Помилка при обробці голосового повідомлення: {e}")
         await message.answer("❌ Помилка при додаванні голосового повідомлення")
         
-@users_orders_router.callback_query(F.data.startswith("finish_correct_"))
+@user_orders_router.callback_query(F.data.startswith("finish_correct_"))
 async def finish_sending_correct_work(callback: CallbackQuery, state: FSMContext) -> None:
     """Завершує процес відправки роботи та надсилає всі файли клієнту."""
     try:

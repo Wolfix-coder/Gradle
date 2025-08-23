@@ -15,14 +15,15 @@ from config import Config
 from text import help_text
 
 # Створюємо роутер
-payments_router = Router()
+user_payments_router = Router()
+admin_payments_router = Router()
 
 # Створюємо об'єкти сервісів
 database_service = DatabaseService()
 payment_service = PaymentService()
 
 # Команда /pay для звичайного користувача
-@payments_router.message(Command("pay"))
+@user_payments_router.message(Command("pay"))
 async def user_pay_command(message: types.Message):
     "Комадна /pay з боку користувача"
 
@@ -32,7 +33,7 @@ async def user_pay_command(message: types.Message):
         reply_markup=get_user_pay_keyboard().as_markup()
     )
 
-@payments_router.callback_query(F.data == "unpaid_order")
+@user_payments_router.callback_query(F.data == "unpaid_order")
 async def show_unpaid_order(callback: CallbackQuery) -> None:
     """Показує список не оплачених замовлень."""
     try:
@@ -81,7 +82,7 @@ async def show_unpaid_order(callback: CallbackQuery) -> None:
             reply_markup=get_user_pay_keyboard().as_markup()
         )
 
-@payments_router.callback_query(F.data == "back_to_home")
+@user_payments_router.callback_query(F.data == "back_to_home")
 async def back_home (callback: CallbackQuery) -> None:
     try:
         await callback.message.answer(help_text, reply_markup=types.ReplyKeyboardRemove())
@@ -90,7 +91,7 @@ async def back_home (callback: CallbackQuery) -> None:
         logger.error(f"Помилка при переході до головного меню юзера: {e}")
         await callback.message.answer("Виникла помилка при переході назад. Будь ласка, введіть команду /help.")
 
-@payments_router.callback_query(F.data.startswith("pay_order_"))
+@user_payments_router.callback_query(F.data.startswith("pay_order_"))
 async def pay_order(callback: CallbackQuery) -> None:
     try:
         await callback.answer()
@@ -140,7 +141,7 @@ async def pay_order(callback: CallbackQuery) -> None:
         logger.error(f"Помилка при обробці оплати: {e}")
         await callback.answer("Виникла помилка при обробці оплати.", show_alert=True)
 
-@payments_router.callback_query(F.data.startswith("paid_"))
+@user_payments_router.callback_query(F.data.startswith("paid_"))
 async def notify_admin_about_payment(callback: CallbackQuery) -> None:
     try:
         user_id = callback.from_user.id
@@ -175,7 +176,7 @@ async def notify_admin_about_payment(callback: CallbackQuery) -> None:
         logger.error(f"Помилка при відправці повідомлення адміністратору для підтвердження оплати: {e}")
         await callback.answer("Щось пішло не так. Спробуйте ще раз або зверніться в підтримку командою /support.", show_alert=True)
 
-@payments_router.callback_query(F.data.startswith("confirm_"))
+@user_payments_router.callback_query(F.data.startswith("confirm_"))
 async def confirm_pay(callback: CallbackQuery) -> None:
     try:
         await callback.answer()

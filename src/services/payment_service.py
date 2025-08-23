@@ -34,7 +34,7 @@ class PaymentService:
                 query = """
                     SELECT p.*, o.ID_user, o.ID_worker, o.subject, o.type_work, o.order_details
                     FROM payments p
-                    JOIN order o ON p.ID_order = o.ID_order
+                    JOIN order_request o ON p.ID_order = o.ID_order
                     WHERE p.status = ? AND p.ID_order = ?
                 """
                 async with db.execute(query, (order_id, status)) as cursor:
@@ -45,7 +45,7 @@ class PaymentService:
                 query = """
                     SELECT p.*, o.ID_user, o.ID_worker, o.subject, o.type_work, o.order_details
                     FROM payments p
-                    JOIN order o ON p.ID_order = o.ID_order
+                    JOIN order_request o ON p.ID_order = o.ID_order
                     WHERE p.status = 0
                     ORDER BY p.created_at DESC
                 """
@@ -67,7 +67,7 @@ class PaymentService:
             async with await database_service._get_db_connection() as db:
                 current_time = datetime.now().isoformat()
                 query = """
-                UPDATE orders SET status = ?, paid_at = ?
+                UPDATE order_request SET status = ?, paid_at = ?
                 WHERE order_id = ?
                 """
                 await db.execute(query, (1, current_time, order_id))
