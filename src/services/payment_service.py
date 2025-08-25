@@ -1,55 +1,42 @@
-import aiosqlite
-
 from datetime import datetime
-from typing import List, Optional, Union
-
-from config import Config
+from typing import Any, Optional, Dict
 
 from model.payments import Payments
 from services.database_service import DatabaseService
 from utils.logging import logger
 
+from config import Config
+
 database_service = DatabaseService()
 
 class PaymentService:
-    async def get_unpaid_orders(self, status: int, order_id: Optional[int] = None) -> Union[List[Payments], Payments, None]:
+    async def get_unpaid_orders(self, client_id: int, status: int) -> Optional[Dict]:
         """
         Отримання не оплачених замовлень
         
         Args:
-            order_id: Якщо вказано, повертає конкретне замовлення. Якщо None - всі неоплачені замовлення
-            status: int
-            
+            client_id: Any - ID клієнту (може бути str "001234" або int 123)
+            status: int - статус оплати (0 - не оплачено; 1 - оплачено)
+        
         Returns:
-            List[Payments] якщо order_id=None
-            Payments якщо order_id вказано і замовлення знайдено
-            None якщо order_id вказано але замовлення не знайдено
+            List[Payments] - список об'єктів Payments з знайденими записами, або None якщо client_id None
         """
         db = None
         try:
             db = await database_service._get_db_connection()
+
+            if client_id == None:
+                logger.warning(f"Користувача {client_id} не знайдено.")
+                return None
             
-            if order_id is not None:
-                # Отримання конкретного замовлення
-                query = """
-                    SELECT p.*, o.ID_user, o.ID_worker, o.subject, o.type_work, o.order_details
-                    FROM payments p
-                    JOIN order_request o ON p.ID_order = o.ID_order
-                    WHERE p.status = ? AND p.ID_order = ?
-                """
-                async with db.execute(query, (order_id, status)) as cursor:
-                    row = await cursor.fetchone()
-                    return Payments(**dict(row)) if row else None
             else:
                 # Отримання всіх неоплачених замовлень
                 query = """
-                    SELECT p.*, o.ID_user, o.ID_worker, o.subject, o.type_work, o.order_details
+                    SELECT p.*
                     FROM payments p
-                    JOIN order_request o ON p.ID_order = o.ID_order
-                    WHERE p.status = 0
-                    ORDER BY p.created_at DESC
+                    WHERE p.client_id = ? AND p.status = ?
                 """
-                async with db.execute(query) as cursor:
+                async with db.execute(query, (client_id, status)) as cursor:
                     rows = await cursor.fetchall()
                     return [Payments(**dict(row)) for row in rows]
                     
@@ -61,16 +48,28 @@ class PaymentService:
                 await db.close()
 
     async def mark_confirm_pay(self, order_id: str) -> bool:
-        """Змінення статусу оплати на ОПЛАЧЕНО (1)"""
+        """Змінення статусу оплати на ОПЛАЧЕНО (1)
+        
+        Args:
+            order_id: str - ID замовлення (наприклад 12345678)
+
+        Returns:
+            True - функція внесла зміни в БД        
+        """
 
         try:
             async with await database_service._get_db_connection() as db:
                 current_time = datetime.now().isoformat()
                 query = """
-                UPDATE order_request SET status = ?, paid_at = ?
-                WHERE order_id = ?
+                UPDATE payments SET status = ?, paid_at = ?
+                WHERE ID_order = ?
                 """
-                await db.execute(query, (1, current_time, order_id))
+                cursor = await db.execute(query, (1, current_time, order_id))
+
+                if cursor.rowcount == 0:
+                    logger.warning(f"Замовлення {order_id} не знайдено в БД")
+                    return False
+                
                 await db.commit()
                 return True
 

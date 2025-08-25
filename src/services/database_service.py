@@ -62,6 +62,7 @@ class DBCreator:
                     CREATE TABLE IF NOT EXISTS payments (
                         id_operation INTEGER PRIMARY KEY AUTOINCREMENT,
                         ID_order TEXT,
+                        client_id TEXT,
                         status TEXT,
                         price REAL,
                         paid REAL,

@@ -37,8 +37,10 @@ async def user_pay_command(message: types.Message):
 async def show_unpaid_order(callback: CallbackQuery) -> None:
     """Показує список не оплачених замовлень."""
     try:
-        payment_service = PaymentService()
-        unpaid_payments = await payment_service.get_unpaid_orders()
+        client_id = callback.from_user.id
+
+        unpaid_payments = await payment_service.get_unpaid_orders(client_id, 0)
+         
 
         if not unpaid_payments:
             keyboard = InlineKeyboardBuilder()
@@ -60,14 +62,15 @@ async def show_unpaid_order(callback: CallbackQuery) -> None:
 
             # Визначаємо статус оплати для кожного платежу
             payment_status = "❌ Не оплачено" if int(payment.status) == 0 else "✅ Оплачено"
-                    
+            order = await database_service.get_by_id('order_request', 'ID_order', payment.ID_order)
+
             payment_text = (
                 f"📌 Замовлення #{payment.ID_order}\n"
-                f"📚 Предмет: {payment.subject}\n"
-                f"📝 Тип роботи: {payment.type_work}\n"
+                f"📚 Предмет: {order.subject}\n"
+                f"📝 Тип роботи: {order.type_work}\n"
                 f"💰 Ціна: {payment.price} грн\n"
                 f"💳 Статус оплати: {payment_status}\n"
-                f"📅 Створено: {payment.created_at}\n"
+                f"📅 Створено: {order.created_at}\n"
             )
                     
             await callback.message.answer(
@@ -84,6 +87,7 @@ async def show_unpaid_order(callback: CallbackQuery) -> None:
 
 @user_payments_router.callback_query(F.data == "back_to_home")
 async def back_home (callback: CallbackQuery) -> None:
+    """Повертає користувача в головне меню (/help)"""
     try:
         await callback.message.answer(help_text, reply_markup=types.ReplyKeyboardRemove())
     
@@ -93,30 +97,32 @@ async def back_home (callback: CallbackQuery) -> None:
 
 @user_payments_router.callback_query(F.data.startswith("pay_order_"))
 async def pay_order(callback: CallbackQuery) -> None:
+    """Процес оплати"""
     try:
         await callback.answer()
 
         order_id = str(callback.data.split('_', 2)[2])  # Витяг номера замовлення для оплати
+        
 
-        # Тепер передаємо order_id як параметр
-        order = await payment_service.get_unpaid_orders(order_id=order_id)
+        # Отримуємо всі поля БД за ключем order_id
+        payment = await database_service.get_by_id('payments', 'ID_order', order_id)
 
-        if not order:
+        if not payment:
             logger.warning(f"Замовлення {order_id} не знайдено при спробі оплати")
             await callback.answer("Замовлення не знайдено.", show_alert=True)
             return
             
         # Перевірка статусу - якщо статус не 0 (неоплачено), то замовлення вже оплачено
-        if int(order.status) != 0:
+        if int(payment.status) != 0:
             logger.info(f"Замовлення {order_id} вже оплачено.")
             await callback.answer("Це замовлення вже оплачено.", show_alert=True)
             return
             
         try:
             keyboard = InlineKeyboardBuilder()
-            keyboard.button(text="Оплатити", callback_data=f"paid_{order.ID_order}")
+            keyboard.button(text="Оплатити", callback_data=f"paid_{payment.ID_order}")
 
-            money = 1 #order.price - order.paid
+            money = payment.price - payment.paid
             
             await callback.message.answer(
                 text=(
@@ -143,16 +149,16 @@ async def pay_order(callback: CallbackQuery) -> None:
 
 @user_payments_router.callback_query(F.data.startswith("paid_"))
 async def notify_admin_about_payment(callback: CallbackQuery) -> None:
+    """Відправлення повідомлення адміністратору про виконану оплату"""
     try:
         user_id = callback.from_user.id
-
-        payment_service = PaymentService()
         order_id = str(callback.data.split('_', 1)[1])  # Витяг номера замовлення для оплати
 
-        # Тепер передаємо order_id як параметр
-        order = await payment_service.get_unpaid_orders(order_id=order_id, status=0)
+        # Отримуємо всі поля за order_id
+        order = await database_service.get_by_id('order_request', 'ID_order', order_id)
+        payment = await database_service.get_by_id('payments', 'ID_order', order_id)
 
-        money = 1 #order.price - order.paid
+        money = payment.price - payment.paid
 
         keyboard = InlineKeyboardBuilder()
         keyboard.button(text="Підтвердити", callback_data=f"confirm_{order_id}")
@@ -178,6 +184,7 @@ async def notify_admin_about_payment(callback: CallbackQuery) -> None:
 
 @user_payments_router.callback_query(F.data.startswith("confirm_"))
 async def confirm_pay(callback: CallbackQuery) -> None:
+    """Підтвердження від адміністратора про сплату"""
     try:
         await callback.answer()
 
@@ -185,18 +192,24 @@ async def confirm_pay(callback: CallbackQuery) -> None:
         order_id = callback.data.split('_', 1)[1]
 
         # Отримання замовлення
-        order = await payment_service.get_unpaid_orders(order_id=order_id, status=(0, 1))
-        if not order:
+        payment = await database_service.get_by_id('payments', 'ID_order', order_id)
+        order = await database_service.get_by_id('order_request', 'ID_order', order_id)
+
+        if not payment and not order:
             await callback.message.answer(f"Замовлення {order_id} не знайдено")
+            return
+        
+        if payment.status != 0:
+            await callback.message.answer(f"Замовлення {order_id} вже оплачено")
             return
 
         # Позначення як оплачене
-        success = await payment_service.mark_confirm_pay(order_id=order_id)
+        success = await payment_service.mark_confirm_pay(order_id)
 
         if success == True:
             logger.info(f"Замовлення {order_id} оплачено.")
             await callback.message.answer(f"Замовлення {order_id} оплачено.")  # Повідомлення адміну
-
+            
             await callback.bot.send_message(
                 chat_id=order.ID_user, 
                 text=f"Ваше замовлення {order_id} було успішно оплачено."  # Повідомлення користувачу
