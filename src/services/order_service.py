@@ -35,6 +35,7 @@ class OrderService:
             async with db.execute("SELECT MAX(ID_order) FROM order_request") as cursor:
                 last_id = await cursor.fetchone()
                 new_id = f"{(int(last_id[0] or 0) + 1):06d}"
+                logger.debug(f"new_id --> {new_id}")
 
             query = """
                 INSERT INTO order_request (
@@ -43,7 +44,7 @@ class OrderService:
                 ) VALUES (?, ?, ?, ?, ?, ?, ?)
             """
             await db.execute(query, (
-                new_id,
+                new_id, 
                 order_data["ID_user"],
                 order_data["subject"],
                 order_data["type_work"],
@@ -54,13 +55,14 @@ class OrderService:
 
             query = """
                 INSERT INTO payments (
-                    ID_order, status, created_at
-                ) VALUES (?, ?, ?)
+                    ID_order, client_id, status, created_at
+                ) VALUES (?, ?, ?, ?)
             """
 
             await db.execute(query, (
                 new_id,
-                False,
+                order_data["ID_user"],
+                str(0),
                 datetime.now().isoformat()
             ))
 

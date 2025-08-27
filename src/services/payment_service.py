@@ -1,3 +1,5 @@
+import aiosqlite
+
 from datetime import datetime
 from typing import Any, Optional, Dict
 
@@ -24,22 +26,26 @@ class PaymentService:
         db = None
         try:
             db = await database_service._get_db_connection()
-
-            if client_id == None:
+            
+            if not client_id:
                 logger.warning(f"Користувача {client_id} не знайдено.")
                 return None
             
             else:
-                # Отримання всіх неоплачених замовлень
-                query = """
-                    SELECT p.*
-                    FROM payments p
-                    WHERE p.client_id = ? AND p.status = ?
-                """
-                async with db.execute(query, (client_id, status)) as cursor:
-                    rows = await cursor.fetchall()
-                    return [Payments(**dict(row)) for row in rows]
-                    
+                try:
+                    # Отримання всіх неоплачених замовлень
+                    query = """
+                        SELECT p.*
+                        FROM payments p
+                        WHERE p.client_id = ? AND p.status = ?
+                        """
+                    async with db.execute(query, (str(client_id), str(status))) as cursor:
+                        rows = await cursor.fetchall()
+                        return [Payments(**dict(row)) for row in rows]
+
+                except aiosqlite.Error as e:
+                    logger.error(f"Помилка бази данних при отриманні данних з таблиці payments: {e}")
+
         except Exception as e:
             logger.error(f"Помилка отримання не оплачених замовлень: {e}")
             raise

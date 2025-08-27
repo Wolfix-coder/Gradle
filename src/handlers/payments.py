@@ -66,11 +66,11 @@ async def show_unpaid_order(callback: CallbackQuery) -> None:
 
             payment_text = (
                 f"📌 Замовлення #{payment.ID_order}\n"
-                f"📚 Предмет: {order.subject}\n"
-                f"📝 Тип роботи: {order.type_work}\n"
+                f"📚 Предмет: {order['subject']}\n"
+                f"📝 Тип роботи: {order['type_work']}\n"
                 f"💰 Ціна: {payment.price} грн\n"
                 f"💳 Статус оплати: {payment_status}\n"
-                f"📅 Створено: {order.created_at}\n"
+                f"📅 Створено: {order['created_at']}\n"
             )
                     
             await callback.message.answer(
@@ -113,16 +113,16 @@ async def pay_order(callback: CallbackQuery) -> None:
             return
             
         # Перевірка статусу - якщо статус не 0 (неоплачено), то замовлення вже оплачено
-        if int(payment.status) != 0:
+        if int(payment['status']) != 0:
             logger.info(f"Замовлення {order_id} вже оплачено.")
             await callback.answer("Це замовлення вже оплачено.", show_alert=True)
             return
             
         try:
             keyboard = InlineKeyboardBuilder()
-            keyboard.button(text="Оплатити", callback_data=f"paid_{payment.ID_order}")
+            keyboard.button(text="Оплатити", callback_data=f"paid_{payment['ID_order']}")
 
-            money = payment.price - payment.paid
+            money = payment['price'] - payment['paid']
             
             await callback.message.answer(
                 text=(
@@ -158,7 +158,7 @@ async def notify_admin_about_payment(callback: CallbackQuery) -> None:
         order = await database_service.get_by_id('order_request', 'ID_order', order_id)
         payment = await database_service.get_by_id('payments', 'ID_order', order_id)
 
-        money = payment.price - payment.paid
+        money = payment['price'] - payment['paid']
 
         keyboard = InlineKeyboardBuilder()
         keyboard.button(text="Підтвердити", callback_data=f"confirm_{order_id}")
@@ -174,7 +174,7 @@ async def notify_admin_about_payment(callback: CallbackQuery) -> None:
                 f"💰 Сума: <b>{money} грн</b>\n\n"
                 f"Перевірте оплату й підтвердьте вручну."
             ),
-            chat_id=int(order.ID_worker),
+            chat_id=int(order['ID_worker']),
             parse_mode="HTML",
             reply_markup=keyboard.as_markup()
         )
@@ -211,7 +211,7 @@ async def confirm_pay(callback: CallbackQuery) -> None:
             await callback.message.answer(f"Замовлення {order_id} оплачено.")  # Повідомлення адміну
             
             await callback.bot.send_message(
-                chat_id=order.ID_user, 
+                chat_id=order['ID_user'], 
                 text=f"Ваше замовлення {order_id} було успішно оплачено."  # Повідомлення користувачу
             )
         else:

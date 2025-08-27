@@ -8,6 +8,9 @@ def setup_logging(name: str = __name__) -> logging.Logger:
     logger = logging.getLogger(name)
     logger.setLevel(logging.INFO)
 
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     # Створюємо директорію для логів якщо її немає
     log_dir = Path("logs")
     log_dir.mkdir(exist_ok=True)
@@ -16,7 +19,6 @@ def setup_logging(name: str = __name__) -> logging.Logger:
     formatter = logging.Formatter(
         '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     )
-
     # Хендлер для консолі
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setFormatter(formatter)

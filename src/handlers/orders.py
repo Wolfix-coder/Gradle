@@ -117,8 +117,8 @@ async def process_details(message: Message, state: FSMContext):
             bot=message.bot
         )
         
-        if not new_id:
-            raise ValueError(f"Не вдалося створити замовлення")
+        if new_id is None:
+            raise ValueError(f"Не вдалося створити замовлення new_id --> None")
 
         await message.answer("Ваше замовлення успішно створено та відправлено на обробку!")
         await state.clear()
