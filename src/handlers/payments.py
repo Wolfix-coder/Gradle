@@ -124,7 +124,7 @@ async def pay_order(callback: CallbackQuery) -> None:
             keyboard = InlineKeyboardBuilder()
             keyboard.button(text="Оплатити", callback_data=f"paid_{payment['ID_order']}")
 
-            money = payment['price'] - payment['paid']
+            money = payment['price']
             
             await callback.message.answer(
                 text=(
@@ -160,10 +160,10 @@ async def notify_admin_about_payment(callback: CallbackQuery) -> None:
         order = await database_service.get_by_id('order_request', 'ID_order', order_id)
         payment = await database_service.get_by_id('payments', 'ID_order', order_id)
 
-        money = payment['price'] - payment['paid']
+        money = payment['price']
 
         keyboard = InlineKeyboardBuilder()
-        keyboard.button(text="Підтвердити", callback_data=f"confirm_{order_id}")
+        keyboard.button(text="Підтвердити", callback_data=f"confirm_pay_{order_id}")
         keyboard.button(text="Відхилити", callback_data=f"reject_{order_id}")
         
         # Відправляємо повідомлення адміністратору
@@ -184,14 +184,14 @@ async def notify_admin_about_payment(callback: CallbackQuery) -> None:
         logger.error(f"Помилка при відправці повідомлення адміністратору для підтвердження оплати: {e}")
         await callback.answer("Щось пішло не так. Спробуйте ще раз або зверніться в підтримку командою /support.", show_alert=True)
 
-@user_payments_router.callback_query(F.data.startswith("confirm_"))
+@user_payments_router.callback_query(F.data.startswith("confirm_pay_"))
 async def confirm_pay(callback: CallbackQuery) -> None:
     """Підтвердження від адміністратора про сплату"""
     try:
         await callback.answer()
 
         # Витяг id замовлення з callback запиту  
-        order_id = callback.data.split('_', 1)[1]
+        order_id = callback.data.split('_', 2)[2]
 
         # Отримання замовлення
         payment = await database_service.get_by_id('payments', 'ID_order', order_id)
@@ -201,7 +201,8 @@ async def confirm_pay(callback: CallbackQuery) -> None:
             await callback.message.answer(f"Замовлення {order_id} не знайдено")
             return
         
-        if payment.status != 0:
+        if int(payment['status']) != 0:
+            logger.info(payment['status'])
             await callback.message.answer(f"Замовлення {order_id} вже оплачено")
             return
 
@@ -224,6 +225,7 @@ async def confirm_pay(callback: CallbackQuery) -> None:
         await callback.message.answer("Сталася помилка під час обробки платежу.")
 
 @admin_payments_router.callback_query(F.data.startswith("put_price_"))
+@require_admin
 async def put_price(callback: CallbackQuery, state: FSMContext) -> None:
     try:
         await callback.answer()
@@ -258,7 +260,12 @@ async def await_price(message: Message, state: FSMContext) -> None:
         if not payment_request_status:
             await message.answer("Виникла помилка. Спробуйте пізніше.")
         else:
+
             await message.answer("Все ОК) Дані додані до бази данних.")
+
+            keyboard = InlineKeyboardBuilder()
+            keyboard.button(text="Оплатити", callback_data=f"pay_order_{payment_detail['order_id']}")
+            keyboard.adjust(1)
 
             order = await database_service.get_by_id("order_request", "ID_order", payment_detail["order_id"])
             user_data = await database_service.get_by_id("user_data", "ID", order["ID_worker"])
@@ -277,7 +284,10 @@ async def await_price(message: Message, state: FSMContext) -> None:
             )
 
             await message.answer(text=client_message, parse_mode="HTML")
-            await message.bot.send_message(chat_id=order['ID_user'], text=client_message, parse_mode="HTML")
+            await message.bot.send_message(chat_id=order['ID_user'], 
+                                           text=client_message, 
+                                           parse_mode="HTML",
+                                           reply_markup=keyboard.as_markup())
 
             await state.clear()
     except Exception as e:
