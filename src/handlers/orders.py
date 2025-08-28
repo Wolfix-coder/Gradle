@@ -222,7 +222,7 @@ async def take_order(callback: CallbackQuery) -> None:
         
         # Створюємо клавіатуру для оновленого повідомлення
         keyboard = InlineKeyboardBuilder()
-        keyboard.button(text="📋 Мої активні замовлення", callback_data="my_orders")
+        keyboard.button(text="📋 Поставити ціну", callback_data=f"put_price_{order_id}")
         keyboard.button(text="🔙 Назад", callback_data="back_to_admin")
         keyboard.adjust(1)  # Розміщуємо кнопки в один стовпчик
 

@@ -1,12 +1,14 @@
+from datetime import datetime
+
 from aiogram import Router, types, F
-from aiogram.enums import ParseMode
-from aiogram.types import Message, CallbackQuery
 from aiogram.filters import Command
+from aiogram.fsm.context import FSMContext
+from aiogram.types import Message, CallbackQuery
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from model.payments import Payments
 from services.database_service import DatabaseService
 from services.payment_service import PaymentService
+from states.payments_state import PaymentStates
 from utils.decorators import require_admin
 from utils.keyboards import get_user_pay_keyboard
 from utils.logging import logger
@@ -220,3 +222,65 @@ async def confirm_pay(callback: CallbackQuery) -> None:
     except Exception as e:
         logger.error(f"Помилка при підтвердженні оплати замовлення {order_id}: {e}")
         await callback.message.answer("Сталася помилка під час обробки платежу.")
+
+@admin_payments_router.callback_query(F.data.startswith("put_price_"))
+async def put_price(callback: CallbackQuery, state: FSMContext) -> None:
+    try:
+        await callback.answer()
+
+        # Витяг id замовлення з callback запиту  
+        order_id = callback.data.split('_', 2)[2]
+
+        await callback.message.answer(f"В наступному повідомленні надайте повну ціну данного замовлення (#{order_id}).\n Повідомлення повинне бути в числовому форматі та округлено до сотих. Наприклад 12.34")
+
+        await state.set_state(PaymentStates.AWAITING_PRICE)
+        await state.update_data(order_id=order_id)
+
+    except Exception as e:
+        logger.error(f"Помилка при спробі відображення меню встановлення ціни: {e}")
+        await callback.message.answer("Проблеми з відображенням меню. \n Спробуйте трохи пізніше.")
+        await state.clear()
+
+@admin_payments_router.message(PaymentStates.AWAITING_PRICE)
+async def await_price(message: Message, state: FSMContext) -> None:
+    try:
+        try:
+            price = round(float(message.text.replace(',', '.')), 2)
+        except ValueError:
+            await message.answer("Невірний формат ціни. Приклад: 12.34")
+            return
+        
+        await state.update_data(price=price)
+        payment_detail = await state.get_data()
+
+        payment_request_status = await payment_service.write_price(payment_detail["order_id"], payment_detail["price"])
+        
+        if not payment_request_status:
+            await message.answer("Виникла помилка. Спробуйте пізніше.")
+        else:
+            await message.answer("Все ОК) Дані додані до бази данних.")
+
+            order = await database_service.get_by_id("order_request", "ID_order", payment_detail["order_id"])
+            user_data = await database_service.get_by_id("user_data", "ID", order["ID_worker"])
+
+            client_message = (
+                f"--- Замовлення оновлено ---\n"
+                f"<b>Час:</b> {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+                f"<b>ID замовлення:</b> {order['ID_order']}\n"
+                f"<b>Від:</b> @{order['ID_user'] or 'Без нікнейма'}\n"
+                f"<b>Виконавець:</b> @{user_data['user_link'] or 'Без нікнейм'}\n"
+                f"<b>Предмет:</b> {order['subject']}\n"
+                f"<b>Тип роботи:</b> {order['type_work']}\n"
+                f"<b>Деталі замовлення:</b> {order['order_details']}\n"
+                f"<b>Ціна:</b> {payment_detail['price']}\n"
+                f"---------------------------"
+            )
+
+            await message.answer(text=client_message, parse_mode="HTML")
+            await message.bot.send_message(chat_id=order['ID_user'], text=client_message, parse_mode="HTML")
+
+            await state.clear()
+    except Exception as e:
+        logger.error(f"Помилка додавання ціни в стани: {e}")
+        await message.answer("Щось пішло не так. \nСпробуйте ще раз пізніше.")
+        await state.clear()

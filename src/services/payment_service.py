@@ -12,6 +12,43 @@ from config import Config
 database_service = DatabaseService()
 
 class PaymentService:
+    async def write_price(self, order_id: str, price: float) -> bool:
+        """
+        Запис ціни на замовлення
+
+        Args:
+            order_id: str - ID замовлення (наприклад 12345678) 
+            price: float - ціна на замовлення (наприкла 12.34)
+
+        Return:
+            True or False - результат виконнаня функції
+        """
+        db = None
+        try:
+            db = await database_service._get_db_connection()
+            query = """
+            UPDATE payments SET price = ?
+            WHERE ID_order = ?
+            """
+            cursor = await db.execute(query, (price, order_id))
+
+            if cursor.rowcount == 0:
+                logger.warning(f"Замовлення {order_id} не знайдено в БД")
+                return False
+            
+            await db.commit()
+            return True
+        except aiosqlite.Error as e:
+            logger.error(f"Помилка бази данних (внесення прайсу в БД): {e}")
+            return False
+        except Exception as e:
+            logger.error(f"Помилка внесення прайсу в БД: {e}")
+            return False
+        finally:
+            if db:
+                await db.close()
+
+
     async def get_unpaid_orders(self, client_id: int, status: int) -> Optional[Dict]:
         """
         Отримання не оплачених замовлень
@@ -62,23 +99,26 @@ class PaymentService:
         Returns:
             True - функція внесла зміни в БД        
         """
-
+        db = None
         try:
-            async with await database_service._get_db_connection() as db:
-                current_time = datetime.now().isoformat()
-                query = """
-                UPDATE payments SET status = ?, paid_at = ?
-                WHERE ID_order = ?
-                """
-                cursor = await db.execute(query, (1, current_time, order_id))
+            db = await database_service._get_db_connection()
+            current_time = datetime.now().isoformat()
+            query = """
+            UPDATE payments SET status = ?, paid_at = ?
+            WHERE ID_order = ?
+            """
+            cursor = await db.execute(query, (1, current_time, order_id))
 
-                if cursor.rowcount == 0:
-                    logger.warning(f"Замовлення {order_id} не знайдено в БД")
-                    return False
-                
-                await db.commit()
-                return True
+            if cursor.rowcount == 0:
+                logger.warning(f"Замовлення {order_id} не знайдено в БД")
+                return False
+            
+            await db.commit()
+            return True
 
         except Exception as e:
             logger.error(f"Замовлення {order_id} не позначено як оплачене: {e}")
             return False
+        finally:
+            if db:
+                await db.close()
