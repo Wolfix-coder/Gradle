@@ -10,6 +10,7 @@ from services.database_service import DatabaseService
 from services.payment_service import PaymentService
 from states.payments_state import PaymentStates
 from utils.decorators import require_admin
+from utils.dict import work_dict
 from utils.keyboards import get_user_pay_keyboard
 from utils.logging import logger
 
@@ -68,8 +69,8 @@ async def show_unpaid_order(callback: CallbackQuery) -> None:
 
             payment_text = (
                 f"📌 Замовлення #{payment.ID_order}\n"
-                f"📚 Предмет: {order['subject']}\n"
-                f"📝 Тип роботи: {order['type_work']}\n"
+                f"📚 Предмет: {work_dict.subjects.get(order['subject'], order['subject'])}\n"
+                f"📝 Тип роботи: {work_dict.type_work.get(order['type_work'], order['type_work'])}\n"
                 f"💰 Ціна: {payment.price} грн\n"
                 f"💳 Статус оплати: {payment_status}\n"
                 f"📅 Створено: {order['created_at']}\n"
@@ -276,8 +277,8 @@ async def await_price(message: Message, state: FSMContext) -> None:
                 f"<b>ID замовлення:</b> {order['ID_order']}\n"
                 f"<b>Від:</b> @{order['ID_user'] or 'Без нікнейма'}\n"
                 f"<b>Виконавець:</b> @{user_data['user_link'] or 'Без нікнейм'}\n"
-                f"<b>Предмет:</b> {order['subject']}\n"
-                f"<b>Тип роботи:</b> {order['type_work']}\n"
+                f"<b>Предмет:</b> {work_dict.subjects.get(order['subject'], order['subject'])}\n"
+                f"<b>Тип роботи:</b> {work_dict.type_work.get(order['type_work'], order['type_work'])}\n"
                 f"<b>Деталі замовлення:</b> {order['order_details']}\n"
                 f"<b>Ціна:</b> {payment_detail['price']}\n"
                 f"---------------------------"

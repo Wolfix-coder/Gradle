@@ -1,13 +1,11 @@
 import aiosqlite
 
 from datetime import datetime
-from typing import Any, Optional, Dict
+from typing import Optional, Dict
 
 from model.payments import Payments
 from services.database_service import DatabaseService
 from utils.logging import logger
-
-from config import Config
 
 database_service = DatabaseService()
 

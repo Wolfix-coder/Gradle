@@ -11,6 +11,7 @@ from services.order_service import OrderService
 from states.order_states import OrderStates
 from utils.logging import logger
 from utils.decorators import require_admin
+from utils.dict import work_dict
 from utils.keyboards import get_worker_order_keyboard, subject_keyboard, type_work_keyboard
 from utils.validators import validate_input
 
@@ -155,8 +156,8 @@ async def show_new_orders(callback: CallbackQuery) -> None:
 
             order_text = (
                 f"📌 Замовлення #{order['ID_order']}\n"
-                f"📚 Предмет: {order['subject']}\n"
-                f"📝 Тип роботи: {order['type_work']}\n"
+                f"📚 Предмет: {work_dict.subjects.get(order['subject'], order['subject'])}\n"
+                f"📝 Тип роботи: {work_dict.type_work.get(order['type_work'], order['type_work'])}\n"
                 f"📋 Деталі: {order['order_details']}\n"
                 f"👤 Замовник: @{order['user_link']}\n"
                 f"📅 Створено: {order['created_at']}"
@@ -762,8 +763,8 @@ async def show_worker_orders_handler(callback: CallbackQuery) -> None:
             for order in orders:
                 order_text = (
                     f"📌 Замовлення #{order['ID_order']}\n"
-                    f"📚 Предмет: {order['subject']}\n"
-                    f"📝 Тип роботи: {order['type_work']}\n"
+                    f"📚 Предмет: {work_dict.subjects.get(order['subject'], order['subject'])}\n"
+                    f"📝 Тип роботи: {work_dict.type_work.get(order['type_work'], order['type_work'])}\n"
                     f"👤 Замовник: @{order['user_link']}\n"
                     f"📅 Створено: {order['created_at']}\n"
                     f"📋 Деталі: {order['order_details']}\n"

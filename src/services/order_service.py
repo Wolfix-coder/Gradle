@@ -7,6 +7,7 @@ from typing import Optional, Dict, Any
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from model.order import OrderStatus
+from utils.dict import work_dict
 
 from config import Config
 from utils.logging import logger
@@ -142,8 +143,8 @@ class OrderService:
         try:
             prepared_order = {
                 "ID_user": user_id,
-                "subject": order_data["subject"],
-                "type_work": order_data["type_work"],
+                "subject": work_dict.subjects.get(order_data["subject"], order_data["subject"]),
+                "type_work": work_dict.type_work.get(order_data["type_work"], order_data["type_work"]),
                 "order_details": comment,
                 "status": OrderStatus.NEW.value,
                 "created_at": datetime.now().isoformat()
@@ -188,8 +189,8 @@ class OrderService:
                 f"<b>Час:</b> {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
                 f"<b>ID замовлення:</b> {order_id}\n"
                 f"<b>Від:</b> @{username or 'Без нікнейма'}\n"
-                f"<b>Предмет:</b> {order_data['subject']}\n"
-                f"<b>Тип роботи:</b> {order_data['type_work']}\n"
+                f"<b>Предмет:</b> {work_dict.subjects.get(order_data['subject'], order_data['subject'])}\n"
+                f"<b>Тип роботи:</b> {work_dict.type_work.get(order_data['type_work'], order_data['type_work'])}\n"
                 f"<b>Деталі замовлення:</b> {comment}\n"
                 f"---------------------------"
             )
