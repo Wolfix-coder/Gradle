@@ -185,6 +185,27 @@ async def notify_admin_about_payment(callback: CallbackQuery) -> None:
         logger.error(f"Помилка при відправці повідомлення адміністратору для підтвердження оплати: {e}")
         await callback.answer("Щось пішло не так. Спробуйте ще раз або зверніться в підтримку командою /support.", show_alert=True)
 
+@admin_payments_router.callback_query(F.data.startswith("reject_"))
+async def reject_pay(callback: CallbackQuery) -> None:
+    try:
+        await callback.answer()
+        await callback.message.delete()
+
+        order_id = callback.data.split('_', 1)[1]
+        order = database_service.get_by_id('order_request', 'ID_order', order_id)
+
+        await callback.bot.send_message(chat_id=order['ID_user'],
+                                        text=(
+                                            f"Схоже що адміністратор відхилив ваш запрос на підтвердження оплати.\n"
+                                            f"Будь ласка, перевірте чи ви перевели повну суму роботи.\n"
+                                            f"Якщо адміністратор вже декілька разів відхилив вашу заявку, будь ласка, напишіть нам в підтримку /support ."
+                                        ), reply_markup=get_user_pay_keyboard().as_markup())
+        
+        await callback.bot.send_message(chat_id=order['ID_worker'], text="Заявка успішно відхилина.")
+    except Exception as e:
+        logger.error(f"Помилка при відхилені заяіки на оплату reject_pay(): {e}")
+        raise
+
 @user_payments_router.callback_query(F.data.startswith("confirm_pay_"))
 async def confirm_pay(callback: CallbackQuery) -> None:
     """Підтвердження від адміністратора про сплату"""

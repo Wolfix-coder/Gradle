@@ -34,7 +34,7 @@ class AdminService:
                          order_details: str,
                          price: float,
                          order_status: int,
-                         payment_status: int):
+                         payment_status: int) -> str:
 
         """
         Генерація інформаційного повідомлення
@@ -49,6 +49,9 @@ class AdminService:
             price: float - ціна
             order_status: int - статус виконання замовлення 
             payment_status: int - статус оплати замовлення
+        
+        Return:
+            args: str - готовий інформаційний текст - повідомлення
         """
         try:    
             client_message = (
@@ -67,3 +70,4 @@ class AdminService:
             return client_message
         except Exception as e:
             logger.error(f"Помилка при генерації тексту повідомлення: {e}")
+            raise

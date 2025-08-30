@@ -87,3 +87,4 @@ async  def status_order(message: Message) -> None:
 
     except Exception as e:
         logger.error(f"eroor: {e}")
+        raise
