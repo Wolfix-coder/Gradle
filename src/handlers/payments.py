@@ -192,7 +192,7 @@ async def reject_pay(callback: CallbackQuery) -> None:
         await callback.message.delete()
 
         order_id = callback.data.split('_', 1)[1]
-        order = database_service.get_by_id('order_request', 'ID_order', order_id)
+        order = await database_service.get_by_id('order_request', 'ID_order', order_id)
 
         await callback.bot.send_message(chat_id=order['ID_user'],
                                         text=(

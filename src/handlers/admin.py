@@ -52,16 +52,14 @@ async  def status_order(message: Message) -> None:
             await message.answer(text=(
                 f"Неправильний формат команди!\n"
                 f"Введіть команду ще раз з одним з наступних параметрів:\n"
-                f"--order_id ### - пошук замовлення по ІD замовлення;\n"
-                f"--all - відображення всіх замовлень, що є в системі;\n"
-                f"--order_status # - пошук замовлень по статусу роботи;\n"
-                f"--pay_status # - пошук замовлень по статусу оплати;\n"
-                f"--user ### - пошук замовлень по ID клієнта.\n"
+                f"-order_id ### - пошук замовлення по ІD замовлення;\n"
+                f"-order_status # - пошук замовлень по статусу роботи;\n"
+                f"-pay_status # - пошук замовлень по статусу оплати;\n"
+                f"-user ### - пошук замовлень по ID клієнта.\n"
             ))
             return
         
         order_id = args.get('order_id')
-        show_all = args.get('all', False)
         filters_order_status = args.get('order_status')
         filters_pay_status = args.get('pay_status')  
         filters_user = args.get('user')
@@ -74,12 +72,68 @@ async  def status_order(message: Message) -> None:
             text_message = admin_service.generate_message(order['ID_order'], order['ID_user'], order['ID_worker'], order['subject'], order['type_work'], order['order_details'], payment['price'], order['status'], payment['status'])
 
             await message.answer(text=text_message, parse_mode='HTML')
-        elif show_all:
-            pass
         elif filters_order_status:
-            pass
+            try:
+                logger.info(f"Шукаємо замовлення зі статусом: {filters_order_status}")
+
+                # 1. Отримуємо всі замовлення за статусом  
+                orders = await database_service.get_all_by_field('order_request', 'status', filters_order_status)
+                logger.info(f"Знайдено замовлень: {len(orders)}")
+
+                if not orders:
+                    await message.answer("Замовлень з таким статусом не знайдено.")
+                    return
+
+                # 2. Для кожного замовлення отримуємо платежі
+                for i, order in enumerate(orders):
+                    logger.info(f"Обробляємо замовлення {i+1}: {order}")
+
+                    order_id = order['ID_order']
+                    logger.info(f"ID замовлення: {order_id}")
+
+                    # Отримуємо платежі для цього ID_order
+                    payments = await database_service.get_all_by_field('payments', 'ID_order', order_id)
+                    logger.info(f"Знайдено платежів: {len(payments)}")
+                    logger.info(f"Платежі: {payments}")
+
+                    # Якщо є платежі
+                    if payments:
+                        for j, payment in enumerate(payments):
+                            logger.info(f"Обробляємо платіж {j+1}: {payment}")
+
+                            # Перевіряємо чи є потрібні поля
+                            if 'price' not in payment:
+                                logger.error(f"Поле 'price' відсутнє в платежі: {payment}")
+                                continue
+                            if 'status' not in payment:
+                                logger.error(f"Поле 'status' відсутнє в платежі: {payment}")
+                                continue
+                            
+                            text_message = admin_service.generate_message(
+                                order['ID_order'], 
+                                order['ID_user'], 
+                                order['ID_worker'], 
+                                order['subject'], 
+                                order['type_work'], 
+                                order['order_details'], 
+                                payment['price'],
+                                order['status'], 
+                                payment['status']
+                            )
+                            logger.info("Відправляємо повідомлення...")
+                            await message.answer(text=text_message, parse_mode='HTML')
+                    else:
+                        logger.info("Платежів немає, відправляємо без платіжної інформації")
+                        await message.answer("Платежів для цього замовлення не знайдено.")
+
+            except Exception as e:
+                logger.error(f"Помилка: {e}")
+                logger.error(f"Тип помилки: {type(e)}")
+                import traceback
+                logger.error(f"Повний traceback: {traceback.format_exc()}")
+                await message.answer("Помилка при отриманні замовлень!")
         elif filters_pay_status:
-            pass
+                    pass
         elif filters_user:
             pass
 
