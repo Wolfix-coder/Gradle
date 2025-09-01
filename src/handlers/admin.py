@@ -72,6 +72,7 @@ async  def status_order(message: Message) -> None:
             text_message = admin_service.generate_message(order['ID_order'], order['ID_user'], order['ID_worker'], order['subject'], order['type_work'], order['order_details'], payment['price'], order['status'], payment['status'])
 
             await message.answer(text=text_message, parse_mode='HTML')
+
         elif filters_order_status:
             try:
                 logger.info(f"Шукаємо замовлення зі статусом: {filters_order_status}")
@@ -124,7 +125,7 @@ async  def status_order(message: Message) -> None:
                             await message.answer(text=text_message, parse_mode='HTML')
                     else:
                         logger.info("Платежів немає, відправляємо без платіжної інформації")
-                        await message.answer("Платежів для цього замовлення не знайдено.")
+                        await message.answer("Платежів по цьому фільтру статусу замовлення не знайдено.")
 
             except Exception as e:
                 logger.error(f"Помилка: {e}")
@@ -132,12 +133,143 @@ async  def status_order(message: Message) -> None:
                 import traceback
                 logger.error(f"Повний traceback: {traceback.format_exc()}")
                 await message.answer("Помилка при отриманні замовлень!")
+                raise
+
         elif filters_pay_status:
-                    pass
+            try:
+                logger.info(f"Шукаємо замовлення зі статусом: {filters_pay_status}")
+
+                # 1. Отримуємо всі замовлення за статусом  
+                payments = await database_service.get_all_by_field('payments', 'status', filters_pay_status)
+                logger.info(f"Знайдено замовлень: {len(payments)}")
+
+                if not payments:
+                    await message.answer("Замовлень з таким статусом не знайдено.")
+                    return
+
+                # 2. Для кожного замовлення отримуємо платежі
+                for i, payment in enumerate(payments):
+                    logger.info(f"Обробляємо замовлення {i+1}: {payment}")
+
+                    order_id = payment['ID_order']
+                    logger.info(f"ID замовлення: {order_id}")
+
+                    # Отримуємо платежі для цього ID_order
+                    orders = await database_service.get_all_by_field('order_request', 'ID_order', order_id)
+                    logger.info(f"Знайдено платежів: {len(orders)}")
+                    logger.info(f"Платежі: {orders}")
+
+                    # Якщо є платежі
+                    if orders:
+                        for j, order in enumerate(orders):
+                            logger.info(f"Обробляємо платіж {j+1}: {order}")
+
+                            # Перевіряємо чи є потрібні поля
+                            if 'ID_user' not in order:
+                                logger.error(f"Поле 'ID_user' відсутнє в платежі: {order}")
+                                continue
+                            if 'ID_worker' not in order:
+                                logger.error(f"Поле 'ID_worker' відсутнє в платежі: {order}")
+                                continue
+                            if 'subject' not in order:
+                                logger.error(f"Поле 'subject' відсутнє в платежі: {order}")
+                                continue
+                            if 'type_work' not in order:
+                                logger.error(f"Поле 'type_worker' відсутнє в платежі: {order}")
+                                continue
+                            if 'order_details' not in order:
+                                logger.error(f"Поле 'order_details' відсутнє в платежі: {order}")
+                                continue
+                            if 'status' not in order:
+                                logger.error(f"Поле 'status' відсутнє в платежі: {order}")
+                                continue
+                            
+                            text_message = admin_service.generate_message(
+                                order['ID_order'], 
+                                order['ID_user'], 
+                                order['ID_worker'], 
+                                order['subject'], 
+                                order['type_work'], 
+                                order['order_details'], 
+                                payment['price'],
+                                order['status'], 
+                                payment['status']
+                            )
+                            logger.info("Відправляємо повідомлення...")
+                            await message.answer(text=text_message, parse_mode='HTML')
+                    else:
+                        logger.info("Платежів немає, відправляємо без платіжної інформації")
+                        await message.answer("Платежів по цьому фільтру статусу оплати не знайдено.")
+
+            except Exception as e:
+                logger.error(f"Помилка: {e}")
+                logger.error(f"Тип помилки: {type(e)}")
+                import traceback
+                logger.error(f"Повний traceback: {traceback.format_exc()}")
+                await message.answer("Помилка при отриманні замовлень!")
+                raise
+       
         elif filters_user:
-            pass
+            try:
+                logger.info(f"Шукаємо замовлення зі статусом: {filters_user}")
 
+                # 1. Отримуємо всі замовлення за статусом  
+                orders = await database_service.get_all_by_field('order_request', 'ID_user', filters_user)
+                logger.info(f"Знайдено замовлень: {len(orders)}")
 
+                if not orders:
+                    await message.answer("Замовлень з таким статусом не знайдено.")
+                    return
+
+                # 2. Для кожного замовлення отримуємо платежі
+                for i, order in enumerate(orders):
+                    logger.info(f"Обробляємо замовлення {i+1}: {order}")
+
+                    order_id = order['ID_order']
+                    logger.info(f"ID замовлення: {order_id}")
+
+                    # Отримуємо платежі для цього ID_order
+                    payments = await database_service.get_all_by_field('payments', 'ID_order', order_id)
+                    logger.info(f"Знайдено платежів: {len(payments)}")
+                    logger.info(f"Платежі: {payments}")
+
+                    # Якщо є платежі
+                    if payments:
+                        for j, payment in enumerate(payments):
+                            logger.info(f"Обробляємо платіж {j+1}: {payment}")
+
+                            # Перевіряємо чи є потрібні поля
+                            if 'price' not in payment:
+                                logger.error(f"Поле 'price' відсутнє в платежі: {payment}")
+                                continue
+                            if 'status' not in payment:
+                                logger.error(f"Поле 'status' відсутнє в платежі: {payment}")
+                                continue
+                            
+                            text_message = admin_service.generate_message(
+                                order['ID_order'], 
+                                order['ID_user'], 
+                                order['ID_worker'], 
+                                order['subject'], 
+                                order['type_work'], 
+                                order['order_details'], 
+                                payment['price'],
+                                order['status'], 
+                                payment['status']
+                            )
+                            logger.info("Відправляємо повідомлення...")
+                            await message.answer(text=text_message, parse_mode='HTML')
+                    else:
+                        logger.info("Платежів немає, відправляємо без платіжної інформації")
+                        await message.answer("Платежів для цього фільтру по користувачам не знайдено.")
+
+            except Exception as e:
+                logger.error(f"Помилка: {e}")
+                logger.error(f"Тип помилки: {type(e)}")
+                import traceback
+                logger.error(f"Повний traceback: {traceback.format_exc()}")
+                await message.answer("Помилка при отриманні замовлень!")
+                raise
 
     except Exception as e:
         logger.error(f"eroor: {e}")
