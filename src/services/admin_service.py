@@ -25,8 +25,8 @@ class AdminService:
             else:  # якщо тільки флаг (пустий рядок)
                 args[arg_name] = True
         return args
-    
-    def generate_message(self, order_id: str,
+
+    def generate_order_info_message(self, order_id: str,
                          client_id: str,
                          ID_worker: str,
                          subject: str,
@@ -51,7 +51,7 @@ class AdminService:
             payment_status: int - статус оплати замовлення
         
         Return:
-            args: str - готовий інформаційний текст - повідомлення
+            client_message: str - готовий інформаційний текст - повідомлення
         """
         try:    
             client_message = (
@@ -69,5 +69,56 @@ class AdminService:
                 )
             return client_message
         except Exception as e:
-            logger.error(f"Помилка при генерації тексту повідомлення: {e}")
+            logger.error(f"Помилка при генерації тексту повідомлення (інформація про замовлення): {e}")
             raise
+
+    def generate_user_info_message(self, ID: int,
+                                        user_name: str,
+                                        user_link: str,
+                                        real_full_name: str,
+                                        for_father: str,
+                                        education: str,
+                                        course: str,
+                                        edu_group: str,
+                                        phone_number: str,
+                                        language_code: str,
+                                        created_at: str) -> str:
+
+            """
+            Генерація інформаційного повідомлення
+
+            Args:
+                ID: int - ID користувача
+                user_name: str - ім'я в telegram користувача
+                user_link: str - посилання на користувача
+                real_full_name: str - справжнє прізвище та ім'я користувача
+                for_father: str - справжнє по-батькові користувача
+                education: str - місце навчання користувача
+                course: str - курс користувача
+                edu_group: str - назва групи користувача
+                phone_number: str - теефонний номер користувача
+                language_code: str - мова якою встановлений додаток користувача
+                crated_at: str - дата створення запису        
+            Return:
+               client_message: str - готовий інформаційний текст - повідомлення
+            """
+            try:    
+                client_message = (
+                        f"--- Інформація користувача ---\n"
+                        f"<b>ID:</b> {ID}\n"
+                        f"<b>НІк:</b> {user_name or 'Без нікнейма'}\n"
+                        f"<b>Посилання:</b> @{user_link or 'Без посилання'}\n"
+                        f"<b>Ім'я та прізвище:</b> {real_full_name}\n"
+                        f"<b>По батькові:</b> {for_father}\n"
+                        f"<b>Навчальний заклад:</b> {education}\n"
+                        f"<b>Курс:</b> {course}\n"
+                        f"<b>Група:</b> {edu_group}\n"
+                        f"<b>Номер телефону:</b> {phone_number}\n"
+                        f"<b>Мова застосунку:</b> {language_code}\n"
+                        f"<b>Акаунт створено:</b> {created_at}\n"
+                        f"---------------------------"
+                    )
+                return client_message
+            except Exception as e:
+                logger.error(f"Помилка при генерації тексту повідомлення (інформація про користувача): {e}")
+                raise

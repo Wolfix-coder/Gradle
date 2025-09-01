@@ -43,7 +43,7 @@ async def back_to_admin(callback: CallbackQuery) -> None:
 
 @admin_router.message(Command("status"))
 @require_admin
-async  def status_order(message: Message) -> None:
+async def status_order(message: Message) -> None:
     try:
         text = message.text
         args = admin_service.parse_command(text)
@@ -69,7 +69,7 @@ async  def status_order(message: Message) -> None:
         if order_id:
             order = await database_service.get_by_id('order_request', 'ID_order', order_id)
             payment = await database_service.get_by_id('payments', 'ID_order', order_id)
-            text_message = admin_service.generate_message(order['ID_order'], order['ID_user'], order['ID_worker'], order['subject'], order['type_work'], order['order_details'], payment['price'], order['status'], payment['status'])
+            text_message = admin_service.generate_order_info_message(order['ID_order'], order['ID_user'], order['ID_worker'], order['subject'], order['type_work'], order['order_details'], payment['price'], order['status'], payment['status'])
 
             await message.answer(text=text_message, parse_mode='HTML')
 
@@ -110,7 +110,7 @@ async  def status_order(message: Message) -> None:
                                 logger.error(f"Поле 'status' відсутнє в платежі: {payment}")
                                 continue
                             
-                            text_message = admin_service.generate_message(
+                            text_message = admin_service.generate_order_info_message(
                                 order['ID_order'], 
                                 order['ID_user'], 
                                 order['ID_worker'], 
@@ -184,7 +184,7 @@ async  def status_order(message: Message) -> None:
                                 logger.error(f"Поле 'status' відсутнє в платежі: {order}")
                                 continue
                             
-                            text_message = admin_service.generate_message(
+                            text_message = admin_service.generate_order_info_message(
                                 order['ID_order'], 
                                 order['ID_user'], 
                                 order['ID_worker'], 
@@ -246,7 +246,7 @@ async  def status_order(message: Message) -> None:
                                 logger.error(f"Поле 'status' відсутнє в платежі: {payment}")
                                 continue
                             
-                            text_message = admin_service.generate_message(
+                            text_message = admin_service.generate_order_info_message(
                                 order['ID_order'], 
                                 order['ID_user'], 
                                 order['ID_worker'], 
@@ -273,4 +273,69 @@ async  def status_order(message: Message) -> None:
 
     except Exception as e:
         logger.error(f"eroor: {e}")
+        raise
+
+@admin_router.message(Command("search"))
+@require_admin
+async def search_user(message: Message):
+    """Пошук користувача за ID"""
+    try:
+        text = message.text
+        args = admin_service.parse_command(text)
+
+        if not args:
+            await message.answer(text=(
+                f"<b>Неправильний формат команди.</b>\n"
+                f"Команда повинна мати фільтр:\n"
+                f"/search -id ### - пошук данних за id.\n"
+                f"/search -link @### - пошук за username.\n"
+            ), parse_mode="HTML")
+            return
+        
+        user_id = args.get('id')
+        user_link = args.get('link')
+
+        logger.debug(f"args = {args}")
+
+        if user_id:
+            user_info = await database_service.get_by_id("user_data", "ID", user_id)
+
+            if not user_info:
+                await message.answer(text="Користувача не знайдено в системі.")
+                return
+            
+            text_message = admin_service.generate_user_info_message(user_info['ID'],
+                                                                    user_info['user_name'],
+                                                                    user_info['user_link'],
+                                                                    user_info['real_full_name'],
+                                                                    user_info['for_father'],
+                                                                    user_info['education'],
+                                                                    user_info['course'],
+                                                                    user_info['edu_group'],
+                                                                    user_info['phone_number'],
+                                                                    user_info['language_code'],
+                                                                    user_info['created_at'])
+            await message.answer(text=text_message, parse_mode="HTML")
+        
+        if user_link:
+            user_info = await database_service.get_by_id("user_data", "user_link", user_link)
+
+            if not user_info:
+                await message.answer(text="Користувача не знайдено в системі.")
+                return
+            
+            text_message = admin_service.generate_user_info_message(user_info['ID'],
+                                                                    user_info['user_name'],
+                                                                    user_info['user_link'],
+                                                                    user_info['real_full_name'],
+                                                                    user_info['for_father'],
+                                                                    user_info['education'],
+                                                                    user_info['course'],
+                                                                    user_info['edu_group'],
+                                                                    user_info['phone_number'],
+                                                                    user_info['language_code'],
+                                                                    user_info['created_at'])
+            await message.answer(text=text_message, parse_mode="HTML")
+        
+    except Exception as e:
         raise
