@@ -26,6 +26,16 @@ class AdminService:
                 args[arg_name] = True
         return args
 
+    def parse_at_tags(self, text) -> str: 
+        """ Розділяє @ теги, додаючи пробіл між @ та іменем користувача """
+
+        # Якщо текст порожній або не містить @
+        if not text or '@' not in text:
+            return text
+
+        # Розділяємо @ та додаємо пробіл після нього
+        return re.sub(r'@(\w+)', r'\1', text)
+
     def generate_order_info_message(self, order_id: str,
                          client_id: str,
                          ID_worker: str,

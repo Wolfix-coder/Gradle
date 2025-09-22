@@ -1,8 +1,7 @@
-import re
-
 from aiogram import Router, F
-from aiogram.types import Message, CallbackQuery
 from aiogram.filters import Command
+from aiogram.types import Message, CallbackQuery
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from services.admin_service import AdminService
 from services.database_service import DatabaseService
@@ -280,62 +279,163 @@ async def status_order(message: Message) -> None:
 async def search_user(message: Message):
     """Пошук користувача за ID"""
     try:
-        text = message.text
-        args = admin_service.parse_command(text)
+        try:
+            text = message.text
+            args = admin_service.parse_command(text)
 
-        if not args:
-            await message.answer(text=(
-                f"<b>Неправильний формат команди.</b>\n"
-                f"Команда повинна мати фільтр:\n"
-                f"/search -id ### - пошук данних за id.\n"
-                f"/search -link @### - пошук за username.\n"
-            ), parse_mode="HTML")
-            return
-        
-        user_id = args.get('id')
-        user_link = args.get('link')
-
-        logger.debug(f"args = {args}")
-
-        if user_id:
-            user_info = await database_service.get_by_id("user_data", "ID", user_id)
-
-            if not user_info:
-                await message.answer(text="Користувача не знайдено в системі.")
+            if not args:
+                await message.answer(text=(
+                    f"<b>Неправильний формат команди.</b>\n"
+                    f"Команда повинна мати фільтр:\n"
+                    f"/search -id ### - пошук данних за id.\n"
+                    f"/search -link @### - пошук за username.\n"
+                ), parse_mode="HTML")
                 return
-            
-            text_message = admin_service.generate_user_info_message(user_info['ID'],
-                                                                    user_info['user_name'],
-                                                                    user_info['user_link'],
-                                                                    user_info['real_full_name'],
-                                                                    user_info['for_father'],
-                                                                    user_info['education'],
-                                                                    user_info['course'],
-                                                                    user_info['edu_group'],
-                                                                    user_info['phone_number'],
-                                                                    user_info['language_code'],
-                                                                    user_info['created_at'])
-            await message.answer(text=text_message, parse_mode="HTML")
-        
-        if user_link:
-            user_info = await database_service.get_by_id("user_data", "user_link", user_link)
 
-            if not user_info:
-                await message.answer(text="Користувача не знайдено в системі.")
-                return
-            
-            text_message = admin_service.generate_user_info_message(user_info['ID'],
-                                                                    user_info['user_name'],
-                                                                    user_info['user_link'],
-                                                                    user_info['real_full_name'],
-                                                                    user_info['for_father'],
-                                                                    user_info['education'],
-                                                                    user_info['course'],
-                                                                    user_info['edu_group'],
-                                                                    user_info['phone_number'],
-                                                                    user_info['language_code'],
-                                                                    user_info['created_at'])
-            await message.answer(text=text_message, parse_mode="HTML")
+            user_id = args.get('id')
+            user_link = admin_service.parse_at_tags(args.get('link'))
+
+        except Exception as e:
+            logger.error(f"Помилка під час парсингу параметрів команди /search : {e}")
+            logger.debug(f"args: = {args}")
+            logger.debug(f"user_id: = {user_id}")
+            logger.debug(f"user_link: = {user_link}")
+            raise
+
+        try:
+            if user_id:
+                user_info = await database_service.get_by_id("user_data", "ID", user_id)
+
+                if not user_info:
+                    await message.answer(text="Користувача не знайдено в системі.")
+                    return
+
+                text_message = admin_service.generate_user_info_message(user_info['ID'],
+                                                                        user_info['user_name'],
+                                                                        user_info['user_link'],
+                                                                        user_info['real_full_name'],
+                                                                        user_info['for_father'],
+                                                                        user_info['education'],
+                                                                        user_info['course'],
+                                                                        user_info['edu_group'],
+                                                                        user_info['phone_number'],
+                                                                        user_info['language_code'],
+                                                                        user_info['created_at'])
+                await message.answer(text=text_message, parse_mode="HTML")
+        except Exception as e:
+            logger.error(f"Сталася помилка під час виконнаня команди /search з параметром -user_id {user_id}: {e}")
+            raise
+
+        try:
+            if user_link:
+                user_info = await database_service.get_by_id("user_data", "user_link", user_link)
+
+                if not user_info:
+                    await message.answer(text="Користувача не знайдено в системі.")
+                    return
+
+                text_message = admin_service.generate_user_info_message(user_info['ID'],
+                                                                        user_info['user_name'],
+                                                                        user_info['user_link'],
+                                                                        user_info['real_full_name'],
+                                                                        user_info['for_father'],
+                                                                        user_info['education'],
+                                                                        user_info['course'],
+                                                                        user_info['edu_group'],
+                                                                        user_info['phone_number'],
+                                                                        user_info['language_code'],
+                                                                        user_info['created_at'])
+                await message.answer(text=text_message, parse_mode="HTML")
+        except Exception as e:
+            logger.error(f"Сталася помилка під час виконнаня команди /search з параметром -user_link {user_link}: {e}")
+            raise
         
     except Exception as e:
+        logger.error(f"Помилка при спробі пошуку користувача: {e}")
         raise
+
+@admin_router.message(Command("send_message"))
+@require_admin
+async def send_message(message: Message):
+    "Відправлення повідомлення користувачу"
+    try:
+        try:
+            """Перевірка аргументів команди"""
+            text = message.text
+            args = admin_service.parse_command(text)
+
+            if not args:
+                    await message.answer(text=(
+                        f"<b>Неправильний формат команди!</b>\n\n"
+                        f"Використовуйте один із варіантів:\n"
+                        f"▫️ <code>/send_message -id ### -text ###</code> — надіслати повідомлення за ID користувача\n"
+                        f"▫️ <code>/send_message -link @### -text ###</code> — надіслати повідомлення за user_link\n\n"
+                        f"<b>Пояснення параметрів:</b>\n"
+                        f"   • <code>-id ###</code> — ID користувача\n"
+                        f"   • <code>-link @###</code> — посилання (username) користувача\n"
+                        f"   • <code>-text ###</code> — текст повідомлення\n"
+
+                    ), parse_mode="HTML")
+                    return
+
+            if not args.get('id'):
+                user_data = await database_service.get_by_id('user_data', 'user_link', admin_service.parse_at_tags(args.get('link')))
+                user_id = user_data['ID']
+            else:
+                if not args.get('link'):
+                    user_id = args.get('id')
+                else:
+                    await message.answer(text=(
+                        f"<b>Неправильний формат команди!</b>\n\n"
+                        f"Використовуйте один із варіантів:\n"
+                        f"▫️ <code>/send_message -id ### -text ###</code> — надіслати повідомлення за ID користувача\n"
+                        f"▫️ <code>/send_message -link @### -text ###</code> — надіслати повідомлення за user_link\n\n"
+                        f"<b>Пояснення параметрів:</b>\n"
+                        f"   • <code>-id ###</code> — ID користувача\n"
+                        f"   • <code>-link @###</code> — посилання (username) користувача\n"
+                        f"   • <code>-text ###</code> — текст повідомлення\n"
+
+                    ), parse_mode="HTML")
+                    return
+
+            if not args.get('text'):
+                await message.answer(text=(
+                        f"<b>Неправильний формат команди!</b>\n\n"
+                        f"Використовуйте один із варіантів:\n"
+                        f"▫️ <code>/send_message -id ### -text ###</code> — надіслати повідомлення за ID користувача\n"
+                        f"▫️ <code>/send_message -link @### -text ###</code> — надіслати повідомлення за user_link\n\n"
+                        f"<b>Пояснення параметрів:</b>\n"
+                        f"   • <code>-id ###</code> — ID користувача\n"
+                        f"   • <code>-link @###</code> — посилання (username) користувача\n"
+                        f"   • <code>-text ###</code> — текст повідомлення\n"
+
+                    ), parse_mode="HTML")
+                return
+
+            text_message = args.get('text')
+        except Exception as e:
+            logger.error(f"Помилка при отриманні параметрів команди /send_message: {e}")
+            logger.debug(f"user_id: = {user_id}")
+            logger.debug(f"text_message: = {text_message}")
+            raise
+        
+        try:
+            admin_id = message.from_user.id
+
+            builder = InlineKeyboardBuilder()
+            builder.button(text="Відповісти", callback_data=f"reply_message:{user_id}:{admin_id}")
+
+            admin_data = await database_service.get_by_id('user_data', 'ID', admin_id)
+
+            await message.bot.send_message(chat_id=user_id, text=(f"Адміністратор: @{admin_data['user_link']} надіслав вам повідомлення."))
+            await message.bot.send_message(chat_id=user_id, text=text_message, parse_mode='HTML', reply_markup=builder.as_markup())
+
+            await message.bot.send_message(chat_id=admin_id, text="Повідомлення успішно відправлено")
+        except Exception as e:
+            await message.answer(f"Виникла помилка при надсиланні листа. Спробуйте пізніше.")
+            logger.error(f"Помилка при надсиланні повідомлення командою /send_message: {e}")
+            raise
+        
+    except Exception as e:
+            logger.error(f"Помилка команди /send_message: {e}")
+            

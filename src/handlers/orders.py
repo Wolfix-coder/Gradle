@@ -440,7 +440,7 @@ async def finish_sending_work(callback: CallbackQuery, state: FSMContext) -> Non
                 reply_markup=keyboard.as_markup()
             )
         except Exception as e:
-            logger.error(f"Помилка при надсиланні повідомлення підтвердження виконання роботи (463): {e}")
+            logger.error(f"Помилка при надсиланні повідомлення підтвердження виконання роботи (443): {e}")
             await callback.answer("Помилка при надсиланні повідомлення підтвердження виконання роботи", show_alert=True)
         
         # Очищаємо стан
@@ -708,7 +708,7 @@ async def finish_sending_correct_work(callback: CallbackQuery, state: FSMContext
             )
 
         except Exception as e:
-            logger.error(f"Помилка при надсиланні повідомлення підтвердження виконання роботи (463): {e}")
+            logger.error(f"Помилка при надсиланні повідомлення підтвердження виконання роботи (711): {e}")
             await callback.answer("Помилка при надсиланні повідомлення підтвердження виконання роботи", show_alert=True)
         
         # Очищаємо стан
