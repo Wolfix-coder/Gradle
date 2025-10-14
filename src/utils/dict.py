@@ -12,7 +12,8 @@ class work_dict:
                 'ua_language': 'Українська мова', 
                 'chemistry': 'Хімія', 
                 'physics': 'Фізика', 
-                'physical_culture': 'Фізична культура'}
+                'physical_culture': 'Фізична культура',
+                'special_lesson': 'Спец. урок'}
     type_work = {
         '1': 'Контрольна робота',
         '2': 'Самостійна робота',

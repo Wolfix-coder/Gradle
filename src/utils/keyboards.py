@@ -39,7 +39,8 @@ def subject_keyboard() -> InlineKeyboardMarkup:
         ("Українська мова", "ua_language"),
         ("Хімія", "chemistry"),
         ("Фізика", "physics"),
-        ("Фізична культура", "physical_culture")
+        ("Фізична культура", "physical_culture"),
+        ("Спец. урок", "special_lesson")
     ]
     for text, callback_data in subjects:
         builder.button(text=text, callback_data=callback_data)

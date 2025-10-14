@@ -159,7 +159,7 @@ async def notify_admin_about_payment(callback: CallbackQuery) -> None:
 
         await callback.message.delete()
 
-        await callback.bot.send_message(user_id, text="Запитна перевірку оплати  надіслано адміністрації.")
+        await callback.bot.send_message(user_id, text="Запит на перевірку оплати  надіслано адміністрації.")
 
         # Отримуємо всі поля за order_id
         order = await database_service.get_by_id('order_request', 'ID_order', order_id)
