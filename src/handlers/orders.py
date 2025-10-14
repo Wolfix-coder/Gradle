@@ -356,100 +356,136 @@ async def handle_voice_for_client(message: Message, state: FSMContext) -> None:
 @require_admin
 async def finish_sending_work(callback: CallbackQuery, state: FSMContext) -> None:
     """Завершує процес відправки роботи та надсилає всі файли клієнту."""
+
     try:
         order_id = callback.data.split("_")[2]
-        data = await state.get_data()
-        files = data.get("files", [])
-        messages = data.get("messages", [])
-        
-        # Отримуємо інформацію про замовлення
         order = await database_service.get_by_id('order_request', 'ID_order', order_id)
-            
-        if not order:
-            await callback.answer("Замовлення не знайдено", show_alert=True)
-            await state.clear()
-            return
-        
-        client_id = order['ID_user']
-        worker_id = order["ID_worker"]
-        send_errors = []
-        
-        # Надсилаємо повідомлення клієнту про виконану роботу
-        try:
-            await callback.bot.send_message(
-                worker_id,
-                f"Замовлення #{order_id} успішно відправлено, очікуйте на підтвердження зі сторони клієнта."
-            )
-            await callback.bot.send_message(
-                client_id,
-                f"✅ Ваше замовлення #{order_id} виконано!\n\n"
-                f"Нижче ви отримаєте всі матеріали від виконавця."
-            )
-        except Exception as e:
-            logger.error(f"Помилка при надсиланні початкового повідомлення: {e}")
-            send_errors.append("початкове повідомлення")
+        payment = await database_service.get_by_id('payments', 'ID_order', order_id)
+        payment_status = "❌ Не оплачено" if int(payment["status"]) == 0 else "✅ Оплачено"
 
-            await callback.bot.send_message(
-                worker_id,
-                f"Замовлення #{order_id} не відправлено спробуйте ще раз трохи пізніше або зверніться до служби підтримки /support .")
-        
-        # Надсилаємо текстові повідомлення
-        for i, msg in enumerate(messages):
-            if msg["type"] == "text":
-                try:
-                    await callback.bot.send_message(client_id, msg["content"])
-                except Exception as e:
-                    logger.error(f"Помилка при надсиланні текстового повідомлення #{i+1}: {e}")
-                    send_errors.append(f"текстове повідомлення #{i+1}")
-        
-        # Надсилаємо файли
-        for i, file in enumerate(files):
+        if payment['status'] == 0:
             try:
-                if file["type"] == "photo":
-                    await callback.bot.send_photo(
-                        client_id, 
-                        file["file_id"],
-                        caption=file["caption"] if file["caption"] else None
-                    )
-                elif file["type"] == "document":
-                    await callback.bot.send_document(
-                        client_id, 
-                        file["file_id"],
-                        caption=file["caption"] if file["caption"] else None
-                    )
-                elif file["type"] == "video":
-                    await callback.bot.send_video(
-                        client_id, 
-                        file["file_id"],
-                        caption=file["caption"] if file["caption"] else None
-                    )
-                elif file["type"] == "voice":
-                    await callback.bot.send_voice(client_id, file["file_id"])
+                await callback.bot.send_message(order['ID_user'], text=(
+                    f"Замовлення вже виконано, але оплата не була проведена.\n" 
+                    f"Якщо ви виконали оплату для данного замовлення, фле бачите це повідомлення зверніться в центр підтримки /support та надішліть скрін оплати.\n" 
+                    f"Також при зверненні до служби підтримки перешліть повідомлення з інформацією про замовлення.\n" 
+                    f"Воно з'явиться нижче."))
+
+                payment_text = (
+                    f"📌 Замовлення #{payment["ID_order"]}\n"
+                    f"📚 Предмет: {work_dict.subjects.get(order['subject'], order['subject'])}\n"
+                    f"📝 Тип роботи: {work_dict.type_work.get(order['type_work'], order['type_work'])}\n"
+                    f"💰 Ціна: {payment["price"]} грн\n"
+                    f"💳 Статус оплати: {payment_status}\n"
+                    f"📅 Створено: {order['created_at']}\n"
+                )
+                await callback.bot.send_message(order['ID_user'], text=payment_text)
+
+                return
             except Exception as e:
-                logger.error(f"Помилка при надсиланні файлу #{i+1} типу {file['type']}: {e}")
-                send_errors.append(f"файл #{i+1} ({file['type']})")
+                logger.error(f"Помилка при надсиланні попередження про несплату замовлення: {e}")
+                await callback.bot.send_message(order["ID_worker"], text="Помилка при надсиланні попередження клієнту. Перевірте логи.")
 
-        try:
-            keyboard = InlineKeyboardBuilder()
-            keyboard.button(text="✅ Все ОК", callback_data=f"complete_order_{order_id}")
-            keyboard.button(text="❌ Потрібні правки", callback_data=f"fix_work_{order_id}")
+        else:
+            try:
+                order_id = callback.data.split("_")[2]
+                data = await state.get_data()
+                files = data.get("files", [])
+                messages = data.get("messages", [])
 
-            await callback.bot.send_message(
-                client_id,
-                "Підтвердіть виконання роботи.",
-                reply_markup=keyboard.as_markup()
-            )
-        except Exception as e:
-            logger.error(f"Помилка при надсиланні повідомлення підтвердження виконання роботи (443): {e}")
-            await callback.answer("Помилка при надсиланні повідомлення підтвердження виконання роботи", show_alert=True)
-        
-        # Очищаємо стан
-        await state.clear()
-        
+                # Отримуємо інформацію про замовлення
+                order = await database_service.get_by_id('order_request', 'ID_order', order_id)
+
+                if not order:
+                    await callback.answer("Замовлення не знайдено", show_alert=True)
+                    await state.clear()
+                    return
+
+                client_id = order['ID_user']
+                worker_id = order["ID_worker"]
+                send_errors = []
+
+                # Надсилаємо повідомлення клієнту про виконану роботу
+                try:
+                    await callback.bot.send_message(
+                        worker_id,
+                        f"Замовлення #{order_id} успішно відправлено, очікуйте на підтвердження зі сторони клієнта."
+                    )
+                    await callback.bot.send_message(
+                        client_id,
+                        f"✅ Ваше замовлення #{order_id} виконано!\n\n"
+                        f"Нижче ви отримаєте всі матеріали від виконавця."
+                    )
+                except Exception as e:
+                    logger.error(f"Помилка при надсиланні початкового повідомлення: {e}")
+                    send_errors.append("початкове повідомлення")
+
+                    await callback.bot.send_message(
+                        worker_id,
+                        f"Замовлення #{order_id} не відправлено спробуйте ще раз трохи пізніше або зверніться до служби підтримки /support .")
+
+                # Надсилаємо текстові повідомлення
+                for i, msg in enumerate(messages):
+                    if msg["type"] == "text":
+                        try:
+                            await callback.bot.send_message(client_id, msg["content"])
+                        except Exception as e:
+                            logger.error(f"Помилка при надсиланні текстового повідомлення #{i+1}: {e}")
+                            send_errors.append(f"текстове повідомлення #{i+1}")
+
+                # Надсилаємо файли
+                for i, file in enumerate(files):
+                    try:
+                        if file["type"] == "photo":
+                            await callback.bot.send_photo(
+                                client_id, 
+                                file["file_id"],
+                                caption=file["caption"] if file["caption"] else None
+                            )
+                        elif file["type"] == "document":
+                            await callback.bot.send_document(
+                                client_id, 
+                                file["file_id"],
+                                caption=file["caption"] if file["caption"] else None
+                            )
+                        elif file["type"] == "video":
+                            await callback.bot.send_video(
+                                client_id, 
+                                file["file_id"],
+                                caption=file["caption"] if file["caption"] else None
+                            )
+                        elif file["type"] == "voice":
+                            await callback.bot.send_voice(client_id, file["file_id"])
+                    except Exception as e:
+                        logger.error(f"Помилка при надсиланні файлу #{i+1} типу {file['type']}: {e}")
+                        send_errors.append(f"файл #{i+1} ({file['type']})")
+
+                try:
+                    keyboard = InlineKeyboardBuilder()
+                    keyboard.button(text="✅ Все ОК", callback_data=f"complete_order_{order_id}")
+                    keyboard.button(text="❌ Потрібні правки", callback_data=f"fix_work_{order_id}")
+
+                    await callback.bot.send_message(
+                        client_id,
+                        "Підтвердіть виконання роботи.",
+                        reply_markup=keyboard.as_markup()
+                    )
+                except Exception as e:
+                    logger.error(f"Помилка при надсиланні повідомлення підтвердження виконання роботи (443): {e}")
+                    await callback.answer("Помилка при надсиланні повідомлення підтвердження виконання роботи", show_alert=True)
+
+                # Очищаємо стан
+                await state.clear()
+
+            except Exception as e:
+                logger.error(f"Помилка при завершенні відправки роботи: {e}")
+                await callback.answer("Помилка при відправці матеріалів клієнту", show_alert=True)
+                await state.clear()
+
     except Exception as e:
-        logger.error(f"Помилка при завершенні відправки роботи: {e}")
-        await callback.answer("Помилка при відправці матеріалів клієнту", show_alert=True)
-        await state.clear()
+        logger.error(f"Помилка при відправленні виконаної роботу клієнту: {e}")
+
+    
 
 @admin_orders_router.callback_query(F.data.startswith("cancel_send_"))
 @require_admin

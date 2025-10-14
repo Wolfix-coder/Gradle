@@ -1,11 +1,13 @@
 from aiogram import Router, F
 from aiogram.filters import Command
+from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, CallbackQuery
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from services.admin_service import AdminService
 from services.database_service import DatabaseService
 from services.order_service import OrderService
+from states.user_states import UserState
 from utils.decorators import require_admin
 from utils.keyboards import get_admin_keyboard
 from utils.logging import logger
@@ -356,7 +358,7 @@ async def search_user(message: Message):
 
 @admin_router.message(Command("send_message"))
 @require_admin
-async def send_message(message: Message):
+async def send_message(message: Message, state: FSMContext):
     "Відправлення повідомлення користувачу"
     try:
         try:
@@ -413,6 +415,10 @@ async def send_message(message: Message):
                 return
 
             text_message = args.get('text')
+
+            await state.set_state(UserState.waiting_for_reply_data)
+            await state.update_data(history=text_message)
+
         except Exception as e:
             logger.error(f"Помилка при отриманні параметрів команди /send_message: {e}")
             logger.debug(f"user_id: = {user_id}")
@@ -423,7 +429,7 @@ async def send_message(message: Message):
             admin_id = message.from_user.id
 
             builder = InlineKeyboardBuilder()
-            builder.button(text="Відповісти", callback_data=f"reply_message:{user_id}:{admin_id}")
+            builder.button(text="Відповісти", callback_data=f"reply_message_user:{user_id}:{admin_id}")
 
             admin_data = await database_service.get_by_id('user_data', 'ID', admin_id)
 
@@ -431,6 +437,8 @@ async def send_message(message: Message):
             await message.bot.send_message(chat_id=user_id, text=text_message, parse_mode='HTML', reply_markup=builder.as_markup())
 
             await message.bot.send_message(chat_id=admin_id, text="Повідомлення успішно відправлено")
+
+            await state.clear()
         except Exception as e:
             await message.answer(f"Виникла помилка при надсиланні листа. Спробуйте пізніше.")
             logger.error(f"Помилка при надсиланні повідомлення командою /send_message: {e}")
@@ -438,4 +446,44 @@ async def send_message(message: Message):
         
     except Exception as e:
             logger.error(f"Помилка команди /send_message: {e}")
-            
+
+@admin_router.callback_query(F.data.startswith("reply_message_admin:"))
+async def reply_message_admin(callback: CallbackQuery, state: FSMContext):
+    try:
+        user_id = callback.from_user.id
+        admin_id = callback.data.split(':', 2)[2]
+
+        await state.set_state(UserState.waiting_for_reply_data)
+        await state.update_data(user_id=user_id, admin_id=admin_id)
+
+        await callback.message.answer(f"Надішліть відповідь користувачу в наступному повідомлені.")
+    except Exception as e:
+        await callback.answer(f"Ой! Виникла помилка. Спробуйте пізніше.")
+        logger.error(f"Помилка при відповіді на калбек кнопку reply_message з боку адміна: {e}")
+
+@admin_router.callback_query(F.data.startswith("reply_message_admin:"))
+async def send_message_to_admin(callback: CallbackQuery, state: FSMContext):
+    try:
+        data = await state.get_data()
+
+        user_id = data.get("user_id")
+        admin_id = data.get("admin_id")
+        history_text = data.get("history")
+
+        builder = InlineKeyboardBuilder()
+        builder.button(text="Відповісти", callback_data=f"reply_message_user:{user_id}:{admin_id}")
+
+        await callback.message.bot.send_message(chat_id=user_id, text=(
+            f"<blockquote> {history_text} </blockquote>\n"
+            f"Повідомлення ->\n"
+            f"{callback.message.text}\n"
+            ), parse_mode="HTML", reply_markup=builder.as_markup())
+        
+        await callback.message.bot.send_message(chat_id=admin_id, text="Повідомлення успішно відправлено")
+
+        await state.clear()
+
+    except Exception as e:
+            await callback.message.answer(f"Виникла помилка при надсиланні листа. Спробуйте пізніше.")
+            logger.error(f"Помилка при надсиланні відповіді на повідомлення калбек кнопкою з боку юзера: {e}")
+            raise

@@ -3,7 +3,7 @@ from aiogram import Router, types, F
 
 from aiogram.filters import Command
 from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
-from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, ContentType
+from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, ContentType, CallbackQuery
 from aiogram.fsm.context import FSMContext
 
 from services.database_service import DatabaseService
@@ -234,3 +234,45 @@ async def get_group(message: Message, state: FSMContext):
     except Exception as e:
         logger.error(f"Unexpected error in get_group: {e}")
         await message.answer("Виникла непередбачена помилка. Спробуйте пізніше.")
+
+@user_router.callback_query(F.data.startswith("reply_message_user:"))
+async def reply_message_user(callback: CallbackQuery, state: FSMContext):
+    try:
+        user_id = callback.from_user.id
+        admin_id = callback.data.split(':', 2)[2]
+
+        await state.set_state(UserState.waiting_for_reply_data)
+        await state.update_data(user_id=user_id, admin_id=admin_id)
+
+        await callback.answer(f"Надішліть відповідь адміністратору в наступному повідомлені.")
+    except Exception as e:
+        await callback.answer(f"Ой! Виникла помилка. Спробуйте пізніше.")
+        logger.error(f"Помилка при відповіді на калбек кнопку reply_message: {e}")
+
+@user_router.message(UserState.waiting_for_reply_data)
+async def send_message_to_user(callback: CallbackQuery, state: FSMContext):
+    try:
+        data = await state.get_data()
+
+        user_id = data.get("user_id")
+        admin_id = data.get("admin_id")
+        history_text = data.get("history")
+
+        builder = InlineKeyboardBuilder()
+        builder.button(text="Відповісти", callback_data=f"reply_message_admin:{user_id}:{admin_id}")
+
+        await callback.message.bot.send_message(chat_id=admin_id, text=(
+            f"<blockquote> {history_text} </blockquote>\n"
+            f"Повідомлення ->\n"
+            f"{callback.message.text}\n"
+            ), parse_mode="HTML", reply_markup=builder.as_markup())
+        
+        await callback.message.bot.send_message(chat_id=user_id, text="Повідомлення успішно відправлено")
+        logger.info(f"user_id = {user_id}, admin_id = {admin_id}, history = {history_text}")
+
+        await state.clear()
+
+    except Exception as e:
+            await callback.message.answer(f"Виникла помилка при надсиланні листа. Спробуйте пізніше.")
+            logger.error(f"Помилка при надсиланні відповіді на повідомлення калбек кнопкою з боку юзера: {e}")
+            raise

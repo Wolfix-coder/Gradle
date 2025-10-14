@@ -63,7 +63,7 @@ class DBCreator:
                         id_operation INTEGER PRIMARY KEY AUTOINCREMENT,
                         ID_order TEXT,
                         client_id TEXT,
-                        status TEXT,
+                        status INT,
                         price REAL,
                         paid REAL,
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
