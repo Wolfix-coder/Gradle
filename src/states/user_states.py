@@ -7,9 +7,8 @@ class UserState(StatesGroup):
     waiting_for_course = State()
     waiting_for_group = State()
 
-    waiting_for_reply_data = State()
-    waiting_for_user_reply_message = State()
-    waiting_for_admin_reply_message = State()
+    waiting_for_reply_message_admin = State()
+    waiting_for_reply_message_user = State()
 
 # class UserData(StatesGroup):
     

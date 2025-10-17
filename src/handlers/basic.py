@@ -2,8 +2,10 @@ from aiogram import Router, types
 from aiogram import F
 from aiogram.filters import Command
 
+from utils.decorators import require_admin
+
 from config import Config
-from text import help_text, about_text, price_text
+from text import help_text, help_text_admin, about_text, price_text
 
 basic_router = Router()
 
@@ -14,6 +16,11 @@ async def text_help(message: types.Message):
 @basic_router.message(Command("help"))
 async def help_handler(message: types.Message):
     await message.answer(help_text, reply_markup=types.ReplyKeyboardRemove())
+
+@basic_router.message(Command("help_admin"))
+@require_admin
+async def help_handler(message: types.Message):
+    await message.answer(help_text_admin, reply_markup=types.ReplyKeyboardRemove())
 
 @basic_router.message(Command("about"))
 async def cmd_about(message: types.Message):
