@@ -10,7 +10,8 @@ from text import help_text, help_text_admin, about_text, price_text
 basic_router = Router()
 
 @basic_router.message(F.text.lower().contains("допомога"))
-async def text_help(message: types, reply_markup=types.ReplyKeyboardRemove())
+async def text_help(message: types.Message):
+    await message.answer(help_text, reply_markup=types.ReplyKeyboardRemove())
 
 @basic_router.message(Command("help"))
 async def help_handler(message: types.Message):
