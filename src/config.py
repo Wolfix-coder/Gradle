@@ -7,6 +7,8 @@ load_dotenv()
 class Config:
     # Токен бота
     BOT_TOKEN = os.getenv("BOT_TOKEN")
+
+    WEBHOOK_BASE_URL = os.getenv("WEBHOOK_BASE_URL")
     
     # ID адміністраторів (можна додати декілька)
     ADMIN_IDS = [int(id) for id in os.getenv("ADMIN_IDS", "").split(",") if id]
