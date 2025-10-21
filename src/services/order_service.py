@@ -149,10 +149,13 @@ class OrderService:
                 "status": OrderStatus.NEW.value,
                 "created_at": datetime.now().isoformat()
             }
+            logger.debug(f"prepared_order: {prepared_order}")
             
             new_id = await self.create_order(prepared_order)
             if not new_id:
                 return None
+            
+            logger.debug(f"nes_id: {new_id}")
 
             await self._send_admin_notification(
                 bot=bot,

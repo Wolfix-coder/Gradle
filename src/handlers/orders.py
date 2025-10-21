@@ -117,7 +117,15 @@ async def process_details(message: Message, state: FSMContext):
             comment=comment,
             bot=message.bot
         )
-        
+        logger.debug(
+            f"\nuser_id: {message.from_user.id}\n"
+            f"username: {message.from_user.username}\n"
+            f"order_data: {order_data}\n"
+            f"comment: {comment}\n"
+            f"bot: {message.bot}\n"
+                     
+                     )
+
         if new_id is None:
             raise ValueError(f"Не вдалося створити замовлення new_id --> None")
 

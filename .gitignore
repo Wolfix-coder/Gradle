@@ -1,4 +1,4 @@
-# Git system folders (на всяк випадок)
+п»ї# Git system folders (РњР® Р‘РЇРЄР™ Р‘РҐРћР®Р”РќР™)
 .git
 .qodo
 
@@ -26,5 +26,7 @@ logs/
 # Cache folders inside src
 /src/**/__pycache__/
 
-# Specific ignored folders (на випадок, якщо щось ще туди потрапить)
-/src/logs/
+# Specific ignored folders (РњР® Р‘РҐРћР®Р”РќР™, РЄР™Р«Рќ Р«РќРЇР­ Р«Р• Р РЎР”РҐ РћРќР РџР®РћРҐР Р­)
+/src/logs/ 
+.toml 
+Dockerfile
