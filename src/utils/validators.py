@@ -1,5 +1,5 @@
-from typing import Optional, Dict, Any
 import re
+from typing import Optional, Dict, Any
 
 ALLOWED_COURSES = ['1', '2', '3', '4']
 

@@ -9,7 +9,7 @@ from model.order import OrderStatus
 from services.database_service import DatabaseService
 from services.order_service import OrderService
 from states.order_states import OrderStates
-from utils.logging import logger
+from utils.logging import get_logger
 from utils.decorators import require_admin
 from utils.dict import work_dict
 from utils.keyboards import get_worker_order_keyboard, subject_keyboard, type_work_keyboard
@@ -21,6 +21,8 @@ from text import type_work_text
 # Створюємо роутер
 user_orders_router = Router()
 admin_orders_router = Router()
+
+logger = get_logger("handlers.orders")
 
 # Ініціалізуємо сервіс
 database_service = DatabaseService()
@@ -41,7 +43,7 @@ async def cmd_order(message: types.Message):
             reply_markup=builder.as_markup()
         )
     except Exception as e:
-        logger.error(f"Error in order command: {e}")
+        logger.exception(f"Error in order command: ")
         await message.answer("Виникла помилка. Спробуйте пізніше.")
 
 @user_orders_router.callback_query(F.data == "no")
@@ -58,7 +60,7 @@ async def callback_yes(query: CallbackQuery, state: FSMContext):
         await state.set_state(OrderStates.waiting_for_type)
         await query.message.answer("Оберіть предмет:", reply_markup=subject_keyboard())
     except Exception as e:
-        logger.error(f"Error in yes callback: {e}")
+        logger.exception(f"Error in yes callback: ")
         await query.message.answer("Виникла помилка. Спробуйте пізніше.")
         await state.clear()
 
@@ -72,7 +74,7 @@ async def process_subject(callback: CallbackQuery, state: FSMContext):
         )
         await state.set_state(OrderStates.waiting_for_details)
     except Exception as e:
-        logger.error(f"Error in process_subject: {e}")
+        logger.exception(f"Error in process_subject: ")
         await callback.message.answer("Виникла помилка. Спробуйте пізніше.")
         await state.clear()
 
@@ -85,7 +87,7 @@ async def process_type(callback: CallbackQuery, state: FSMContext):
         )
         await state.set_state(OrderStates.waiting_for_comment)
     except Exception as e:
-        logger.error(f"Error in process_type: {e}")
+        logger.exception(f"Error in process_type: ")
         await callback.message.answer("Виникла помилка. Спробуйте пізніше.")
         await state.clear()
 
@@ -133,7 +135,7 @@ async def process_details(message: Message, state: FSMContext):
         await state.clear()
         
     except Exception as e:
-        logger.error(f"Помилка в process_details: {e}")
+        logger.exception(f"Помилка в process_details: ")
         await message.answer("Виникла помилка при створенні замовлення. Спробуйте пізніше")
         await state.clear()
 
@@ -162,19 +164,21 @@ async def show_new_orders(callback: CallbackQuery) -> None:
             keyboard.button(text="🔙 Назад", callback_data="back_to_admin")
             keyboard.adjust(1)
 
+            user_data = await database_service.get_by_id('user_data', 'ID', order['ID_user'])
+
             order_text = (
                 f"📌 Замовлення #{order['ID_order']}\n"
                 f"📚 Предмет: {work_dict.subjects.get(order['subject'], order['subject'])}\n"
                 f"📝 Тип роботи: {work_dict.type_work.get(order['type_work'], order['type_work'])}\n"
                 f"📋 Деталі: {order['order_details']}\n"
-                f"👤 Замовник: @{order['user_link']}\n"
+                f"👤 Замовник: @{user_data['user_link']}\n"
                 f"📅 Створено: {order['created_at']}"
             )
 
             await callback.message.answer(order_text, reply_markup=keyboard.as_markup())
 
     except Exception as e:
-        logger.error(f"Помилка при показі нових замовлень: {e}")
+        logger.exception(f"Помилка при показі нових замовлень: ")
         keyboard = InlineKeyboardBuilder()
         keyboard.button(text="🔙 Назад", callback_data="back_to_admin")
         await callback.message.edit_text(
@@ -225,7 +229,7 @@ async def take_order(callback: CallbackQuery) -> None:
         )
         
         if not success:
-            logger.error(f"Не вдалося оновити статус замовлення {order_id}")
+            logger.exception(f"Не вдалося оновити статус замовлення {order_id}")
             await callback.answer("Не вдалося взяти замовлення. Спробуйте пізніше.", show_alert=True)
             return
         
@@ -247,7 +251,7 @@ async def take_order(callback: CallbackQuery) -> None:
         logger.info(f"Замовлення {order_id} успішно взято адміністратором {worker_id} (@{worker_username})")
 
     except Exception as e:
-        logger.error(f"Помилка при взятті замовлення: {e}", exc_info=True)
+        logger.exception(f"Помилка при взятті замовлення: ", exc_info=True)
         await callback.answer("Помилка при взятті замовлення. Спробуйте пізніше.", show_alert=True)      
 
 @admin_orders_router.callback_query(F.data.startswith("send_work_"))
@@ -270,7 +274,7 @@ async def send_work_to_client(callback: CallbackQuery, state: FSMContext) -> Non
         )
         
     except Exception as e:
-        logger.error(f"Помилка при ініціації відправки роботи: {e}")
+        logger.exception(f"Помилка при ініціації відправки роботи: ")
         await callback.answer("Помилка при початку процесу відправки", show_alert=True)
 
 @admin_orders_router.message(OrderStates.AWAITING_WORK, F.text)
@@ -284,7 +288,7 @@ async def handle_text_for_client(message: Message, state: FSMContext) -> None:
         
         await message.answer("✅ Текстове повідомлення додано до черги відправки")
     except Exception as e:
-        logger.error(f"Помилка при обробці текстового повідомлення: {e}")
+        logger.exception(f"Помилка при обробці текстового повідомлення: ")
         await message.answer("❌ Помилка при додаванні повідомлення")
 
 @admin_orders_router.message(OrderStates.AWAITING_WORK, F.photo)
@@ -304,7 +308,7 @@ async def handle_photo_for_client(message: Message, state: FSMContext) -> None:
         
         await message.answer("✅ Фото додано до черги відправки")
     except Exception as e:
-        logger.error(f"Помилка при обробці фото: {e}")
+        logger.exception(f"Помилка при обробці фото: ")
         await message.answer("❌ Помилка при додаванні фото")
 
 @admin_orders_router.message(OrderStates.AWAITING_WORK, F.document)
@@ -322,7 +326,7 @@ async def handle_document_for_client(message: Message, state: FSMContext) -> Non
         
         await message.answer("✅ Документ додано до черги відправки")
     except Exception as e:
-        logger.error(f"Помилка при обробці документа: {e}")
+        logger.exception(f"Помилка при обробці документа: ")
         await message.answer("❌ Помилка при додаванні документа")
 
 @admin_orders_router.message(OrderStates.AWAITING_WORK, F.video)
@@ -340,7 +344,7 @@ async def handle_video_for_client(message: Message, state: FSMContext) -> None:
         
         await message.answer("✅ Відео додано до черги відправки")
     except Exception as e:
-        logger.error(f"Помилка при обробці відео: {e}")
+        logger.exception(f"Помилка при обробці відео: ")
         await message.answer("❌ Помилка при додаванні відео")
 
 @admin_orders_router.message(OrderStates.AWAITING_WORK, F.voice)
@@ -357,7 +361,7 @@ async def handle_voice_for_client(message: Message, state: FSMContext) -> None:
         
         await message.answer("✅ Голосове повідомлення додано до черги відправки")
     except Exception as e:
-        logger.error(f"Помилка при обробці голосового повідомлення: {e}")
+        logger.exception(f"Помилка при обробці голосового повідомлення: ")
         await message.answer("❌ Помилка при додаванні голосового повідомлення")
         
 @admin_orders_router.callback_query(F.data.startswith("finish_sending_"))
@@ -391,7 +395,7 @@ async def finish_sending_work(callback: CallbackQuery, state: FSMContext) -> Non
 
                 return
             except Exception as e:
-                logger.error(f"Помилка при надсиланні попередження про несплату замовлення: {e}")
+                logger.exception(f"Помилка при надсиланні попередження про несплату замовлення: ")
                 await callback.bot.send_message(order["ID_worker"], text="Помилка при надсиланні попередження клієнту. Перевірте логи.")
 
         else:
@@ -425,7 +429,7 @@ async def finish_sending_work(callback: CallbackQuery, state: FSMContext) -> Non
                         f"Нижче ви отримаєте всі матеріали від виконавця."
                     )
                 except Exception as e:
-                    logger.error(f"Помилка при надсиланні початкового повідомлення: {e}")
+                    logger.exception(f"Помилка при надсиланні початкового повідомлення: ")
                     send_errors.append("початкове повідомлення")
 
                     await callback.bot.send_message(
@@ -438,7 +442,7 @@ async def finish_sending_work(callback: CallbackQuery, state: FSMContext) -> Non
                         try:
                             await callback.bot.send_message(client_id, msg["content"])
                         except Exception as e:
-                            logger.error(f"Помилка при надсиланні текстового повідомлення #{i+1}: {e}")
+                            logger.exception(f"Помилка при надсиланні текстового повідомлення #{i+1}: ")
                             send_errors.append(f"текстове повідомлення #{i+1}")
 
                 # Надсилаємо файли
@@ -465,7 +469,7 @@ async def finish_sending_work(callback: CallbackQuery, state: FSMContext) -> Non
                         elif file["type"] == "voice":
                             await callback.bot.send_voice(client_id, file["file_id"])
                     except Exception as e:
-                        logger.error(f"Помилка при надсиланні файлу #{i+1} типу {file['type']}: {e}")
+                        logger.exception(f"Помилка при надсиланні файлу #{i+1} типу {file['type']}: ")
                         send_errors.append(f"файл #{i+1} ({file['type']})")
 
                 try:
@@ -479,19 +483,19 @@ async def finish_sending_work(callback: CallbackQuery, state: FSMContext) -> Non
                         reply_markup=keyboard.as_markup()
                     )
                 except Exception as e:
-                    logger.error(f"Помилка при надсиланні повідомлення підтвердження виконання роботи (443): {e}")
+                    logger.exception(f"Помилка при надсиланні повідомлення підтвердження виконання роботи (443): ")
                     await callback.answer("Помилка при надсиланні повідомлення підтвердження виконання роботи", show_alert=True)
 
                 # Очищаємо стан
                 await state.clear()
 
             except Exception as e:
-                logger.error(f"Помилка при завершенні відправки роботи: {e}")
+                logger.exception(f"Помилка при завершенні відправки роботи: ")
                 await callback.answer("Помилка при відправці матеріалів клієнту", show_alert=True)
                 await state.clear()
 
     except Exception as e:
-        logger.error(f"Помилка при відправленні виконаної роботу клієнту: {e}")
+        logger.exception(f"Помилка при відправленні виконаної роботу клієнту: ")
 
     
 
@@ -509,7 +513,7 @@ async def cancel_sending_work(callback: CallbackQuery, state: FSMContext) -> Non
         await state.clear()
         
     except Exception as e:
-        logger.error(f"Помилка при скасуванні відправки роботи: {e}")
+        logger.exception(f"Помилка при скасуванні відправки роботи: ")
         await callback.answer("Помилка при скасуванні відправки", show_alert=True)
         await state.clear()
         
@@ -550,7 +554,7 @@ async def complete_order(callback: CallbackQuery, state: FSMContext) -> None:
         await state.clear()
 
     except Exception as e:
-        logger.error(f"Помилка при завершенні замовлення: {e}")
+        logger.exception(f"Помилка при завершенні замовлення: ")
         await callback.answer("Помилка при завершенні замовлення", show_alert=True)
 
 @user_orders_router.callback_query(F.data.startswith("fix_work_"))
@@ -572,7 +576,7 @@ async def fix_work(callback: CallbackQuery, state: FSMContext) -> None:
         )
         
     except Exception as e:
-        logger.error(f"Помилка при ініціації відправки правок: {e}")
+        logger.exception(f"Помилка при ініціації відправки правок: ")
         await callback.answer("Помилка при початку процесу відправки", show_alert=True)
 
 @user_orders_router.message(OrderStates.AWAITING_CORRECT, F.text)
@@ -586,7 +590,7 @@ async def handle_text_for_worker_correct(message: Message, state: FSMContext) ->
         
         await message.answer("✅ Текстове повідомлення додано до черги відправки")
     except Exception as e:
-        logger.error(f"Помилка при обробці текстового повідомлення: {e}")
+        logger.exception(f"Помилка при обробці текстового повідомлення: ")
         await message.answer("❌ Помилка при додаванні повідомлення")
 
 @admin_orders_router.message(OrderStates.AWAITING_CORRECT, F.photo)
@@ -606,7 +610,7 @@ async def handle_photo_for_worker_correct(message: Message, state: FSMContext) -
         
         await message.answer("✅ Фото додано до черги відправки")
     except Exception as e:
-        logger.error(f"Помилка при обробці фото: {e}")
+        logger.exception(f"Помилка при обробці фото: ")
         await message.answer("❌ Помилка при додаванні фото")
 
 @admin_orders_router.message(OrderStates.AWAITING_CORRECT, F.document)
@@ -624,7 +628,7 @@ async def handle_document_for_worker_correct(message: Message, state: FSMContext
         
         await message.answer("✅ Документ додано до черги відправки")
     except Exception as e:
-        logger.error(f"Помилка при обробці документа: {e}")
+        logger.exception(f"Помилка при обробці документа: ")
         await message.answer("❌ Помилка при додаванні документа")
 
 @admin_orders_router.message(OrderStates.AWAITING_CORRECT, F.video)
@@ -642,7 +646,7 @@ async def handle_video_for_worker_correct(message: Message, state: FSMContext) -
         
         await message.answer("✅ Відео додано до черги відправки")
     except Exception as e:
-        logger.error(f"Помилка при обробці відео: {e}")
+        logger.exception(f"Помилка при обробці відео: ")
         await message.answer("❌ Помилка при додаванні відео")
 
 @admin_orders_router.message(OrderStates.AWAITING_CORRECT, F.voice)
@@ -659,7 +663,7 @@ async def handle_voice_for_worker_correct(message: Message, state: FSMContext) -
         
         await message.answer("✅ Голосове повідомлення додано до черги відправки")
     except Exception as e:
-        logger.error(f"Помилка при обробці голосового повідомлення: {e}")
+        logger.exception(f"Помилка при обробці голосового повідомлення: ")
         await message.answer("❌ Помилка при додаванні голосового повідомлення")
         
 @user_orders_router.callback_query(F.data.startswith("finish_correct_"))
@@ -691,7 +695,7 @@ async def finish_sending_correct_work(callback: CallbackQuery, state: FSMContext
                 f"Нижче ви отримаєте всі коментарі від клієнта."
             )
         except Exception as e:
-            logger.error(f"Помилка при надсиланні початкового повідомлення: {e}")
+            logger.exception(f"Помилка при надсиланні початкового повідомлення: ")
             send_errors.append("початкове повідомлення")
 
             await callback.bot.send_message(
@@ -705,7 +709,7 @@ async def finish_sending_correct_work(callback: CallbackQuery, state: FSMContext
                 try:
                     await callback.bot.send_message(worker_id, msg["content"])
                 except Exception as e:
-                    logger.error(f"Помилка при надсиланні текстового повідомлення #{i+1}: {e}")
+                    logger.exception(f"Помилка при надсиланні текстового повідомлення #{i+1}: ")
                     send_errors.append(f"текстове повідомлення #{i+1}")
         
         # Надсилаємо файли
@@ -732,7 +736,7 @@ async def finish_sending_correct_work(callback: CallbackQuery, state: FSMContext
                 elif file["type"] == "voice":
                     await callback.bot.send_voice(worker_id, file["file_id"])
             except Exception as e:
-                logger.error(f"Помилка при надсиланні файлу #{i+1} типу {file['type']}: {e}")
+                logger.exception(f"Помилка при надсиланні файлу #{i+1} типу {file['type']}: ")
                 send_errors.append(f"файл #{i+1} ({file['type']})")
 
         try:
@@ -752,14 +756,14 @@ async def finish_sending_correct_work(callback: CallbackQuery, state: FSMContext
             )
 
         except Exception as e:
-            logger.error(f"Помилка при надсиланні повідомлення підтвердження виконання роботи (711): {e}")
+            logger.exception(f"Помилка при надсиланні повідомлення підтвердження виконання роботи (711): ")
             await callback.answer("Помилка при надсиланні повідомлення підтвердження виконання роботи", show_alert=True)
         
         # Очищаємо стан
         await state.clear()
         
     except Exception as e:
-        logger.error(f"Помилка при завершенні відправки роботи: {e}")
+        logger.exception(f"Помилка при завершенні відправки роботи: ")
         await callback.answer("Помилка при відправці матеріалів клієнту", show_alert=True)
         await state.clear()
 
@@ -801,7 +805,7 @@ async def show_worker_orders_handler(callback: CallbackQuery) -> None:
             try:
                 await callback.message.delete()
             except Exception as e:
-                logger.warning(f"Не вдалося видалити повідомлення: {e}")
+                logger.warning(f"Не вдалося видалити повідомлення: ")
 
             # Відправляємо нові повідомлення для кожного замовлення
             for order in orders:
@@ -826,7 +830,7 @@ async def show_worker_orders_handler(callback: CallbackQuery) -> None:
                 )
 
         except Exception as e:
-            logger.error(f"Помилка відображення замовлень воркера: {e}", exc_info=True)
+            logger.exception(f"Помилка відображення замовлень воркера: ", exc_info=True)
         
             try:
                 keyboard = InlineKeyboardBuilder()
@@ -837,7 +841,7 @@ async def show_worker_orders_handler(callback: CallbackQuery) -> None:
                 )
             except Exception as edit_error:
                 # Якщо не вдалося відредагувати, спробуємо відправити нове повідомлення
-                logger.error(f"Додаткова помилка при спробі відредагувати повідомлення: {edit_error}")
+                logger.exception(f"Додаткова помилка при спробі відредагувати повідомлення: {edit_error}")
                 await callback.answer("Сталася помилка при отриманні замовлень", show_alert=True)
 
 

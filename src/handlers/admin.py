@@ -1,20 +1,17 @@
 from aiogram import Router, F
 from aiogram.filters import Command
-from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, CallbackQuery
-from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from services.admin_service import AdminService
 from services.database_service import DatabaseService
 from services.order_service import OrderService
-from states.user_states import UserState
 from utils.decorators import require_admin
 from utils.keyboards import get_admin_keyboard
-from utils.logging import logger
-
-import logging
+from utils.logging import get_logger
 
 admin_router = Router(name='admin')
+
+logger = get_logger("handlers/admin")
 
 admin_service = AdminService()
 database_service = DatabaseService()
@@ -39,7 +36,7 @@ async def back_to_admin(callback: CallbackQuery) -> None:
             reply_markup=get_admin_keyboard().as_markup()
         )
     except Exception as e:
-        logging.error(f"Error returning to admin panel: {e}")
+        logger.exception(f"Error returning to admin panel: ")
         await callback.answer("Error returning to menu", show_alert=True)
 
 @admin_router.message(Command("status"))
@@ -105,10 +102,10 @@ async def status_order(message: Message) -> None:
 
                             # Перевіряємо чи є потрібні поля
                             if 'price' not in payment:
-                                logger.error(f"Поле 'price' відсутнє в платежі: {payment}")
+                                logger.exception(f"Поле 'price' відсутнє в платежі: {payment}")
                                 continue
                             if 'status' not in payment:
-                                logger.error(f"Поле 'status' відсутнє в платежі: {payment}")
+                                logger.exception(f"Поле 'status' відсутнє в платежі: {payment}")
                                 continue
                             
                             text_message = admin_service.generate_order_info_message(
@@ -129,10 +126,10 @@ async def status_order(message: Message) -> None:
                         await message.answer("Платежів по цьому фільтру статусу замовлення не знайдено.")
 
             except Exception as e:
-                logger.error(f"Помилка: {e}")
-                logger.error(f"Тип помилки: {type(e)}")
+                logger.exception(f"Помилка: ")
+                logger.exception(f"Тип помилки: {type(e)}")
                 import traceback
-                logger.error(f"Повний traceback: {traceback.format_exc()}")
+                logger.exception(f"Повний traceback: {traceback.format_exc()}")
                 await message.answer("Помилка при отриманні замовлень!")
                 raise
 
@@ -167,22 +164,22 @@ async def status_order(message: Message) -> None:
 
                             # Перевіряємо чи є потрібні поля
                             if 'ID_user' not in order:
-                                logger.error(f"Поле 'ID_user' відсутнє в платежі: {order}")
+                                logger.exception(f"Поле 'ID_user' відсутнє в платежі: {order}")
                                 continue
                             if 'ID_worker' not in order:
-                                logger.error(f"Поле 'ID_worker' відсутнє в платежі: {order}")
+                                logger.exception(f"Поле 'ID_worker' відсутнє в платежі: {order}")
                                 continue
                             if 'subject' not in order:
-                                logger.error(f"Поле 'subject' відсутнє в платежі: {order}")
+                                logger.exception(f"Поле 'subject' відсутнє в платежі: {order}")
                                 continue
                             if 'type_work' not in order:
-                                logger.error(f"Поле 'type_worker' відсутнє в платежі: {order}")
+                                logger.exception(f"Поле 'type_worker' відсутнє в платежі: {order}")
                                 continue
                             if 'order_details' not in order:
-                                logger.error(f"Поле 'order_details' відсутнє в платежі: {order}")
+                                logger.exception(f"Поле 'order_details' відсутнє в платежі: {order}")
                                 continue
                             if 'status' not in order:
-                                logger.error(f"Поле 'status' відсутнє в платежі: {order}")
+                                logger.exception(f"Поле 'status' відсутнє в платежі: {order}")
                                 continue
                             
                             text_message = admin_service.generate_order_info_message(
@@ -203,10 +200,10 @@ async def status_order(message: Message) -> None:
                         await message.answer("Платежів по цьому фільтру статусу оплати не знайдено.")
 
             except Exception as e:
-                logger.error(f"Помилка: {e}")
-                logger.error(f"Тип помилки: {type(e)}")
+                logger.exception(f"Помилка: ")
+                logger.exception(f"Тип помилки: {type(e)}")
                 import traceback
-                logger.error(f"Повний traceback: {traceback.format_exc()}")
+                logger.exception(f"Повний traceback: {traceback.format_exc()}")
                 await message.answer("Помилка при отриманні замовлень!")
                 raise
        
@@ -241,10 +238,10 @@ async def status_order(message: Message) -> None:
 
                             # Перевіряємо чи є потрібні поля
                             if 'price' not in payment:
-                                logger.error(f"Поле 'price' відсутнє в платежі: {payment}")
+                                logger.exception(f"Поле 'price' відсутнє в платежі: {payment}")
                                 continue
                             if 'status' not in payment:
-                                logger.error(f"Поле 'status' відсутнє в платежі: {payment}")
+                                logger.exception(f"Поле 'status' відсутнє в платежі: {payment}")
                                 continue
                             
                             text_message = admin_service.generate_order_info_message(
@@ -265,15 +262,15 @@ async def status_order(message: Message) -> None:
                         await message.answer("Платежів для цього фільтру по користувачам не знайдено.")
 
             except Exception as e:
-                logger.error(f"Помилка: {e}")
-                logger.error(f"Тип помилки: {type(e)}")
+                logger.exception(f"Помилка: ")
+                logger.exception(f"Тип помилки: {type(e)}")
                 import traceback
-                logger.error(f"Повний traceback: {traceback.format_exc()}")
+                logger.exception(f"Повний traceback: {traceback.format_exc()}")
                 await message.answer("Помилка при отриманні замовлень!")
                 raise
 
     except Exception as e:
-        logger.error(f"eroor: {e}")
+        logger.exception(f"eroor: ")
         raise
 
 @admin_router.message(Command("search"))
@@ -298,7 +295,7 @@ async def search_user(message: Message):
             user_link = admin_service.parse_at_tags(args.get('link'))
 
         except Exception as e:
-            logger.error(f"Помилка під час парсингу параметрів команди /search : {e}")
+            logger.exception(f"Помилка під час парсингу параметрів команди /search : ")
             logger.debug(f"args: = {args}")
             logger.debug(f"user_id: = {user_id}")
             logger.debug(f"user_link: = {user_link}")
@@ -325,7 +322,7 @@ async def search_user(message: Message):
                                                                         user_info['created_at'])
                 await message.answer(text=text_message, parse_mode="HTML")
         except Exception as e:
-            logger.error(f"Сталася помилка під час виконнаня команди /search з параметром -user_id {user_id}: {e}")
+            logger.exception(f"Сталася помилка під час виконнаня команди /search з параметром -user_id {user_id}: ")
             raise
 
         try:
@@ -349,10 +346,10 @@ async def search_user(message: Message):
                                                                         user_info['created_at'])
                 await message.answer(text=text_message, parse_mode="HTML")
         except Exception as e:
-            logger.error(f"Сталася помилка під час виконнаня команди /search з параметром -user_link {user_link}: {e}")
+            logger.exception(f"Сталася помилка під час виконнаня команди /search з параметром -user_link {user_link}: ")
             raise
         
     except Exception as e:
-        logger.error(f"Помилка при спробі пошуку користувача: {e}")
+        logger.exception(f"Помилка при спробі пошуку користувача: ")
         raise
 

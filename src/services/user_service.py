@@ -1,10 +1,12 @@
-from model.user import UserModel
-from .database_service import DatabaseService
-import logging
 import aiosqlite
 from typing import Optional
+
+from model.user import UserModel
 from model.user import User
-from utils.logging import logger
+from services.database_service import DatabaseService
+from utils.logging import get_logger
+
+logger = get_logger("services/user_service")
 
 class UserService:
     def __init__(self):
@@ -27,7 +29,7 @@ class UserService:
                 return None
                 
         except Exception as e:
-            logging.error(f"Error getting user: {e}")
+            logger.exception(f"Error getting user: ")
             raise
 
     async def create_user(self, user: UserModel) -> bool:
@@ -47,7 +49,7 @@ class UserService:
                 return True
                 
         except Exception as e:
-            logging.error(f"Error creating user: {e}")
+            logger.exception(f"Error creating user: ")
             raise
 
     @staticmethod
@@ -75,7 +77,7 @@ class UserService:
                 await db.commit()
                 return True
         except aiosqlite.Error as e:
-            logger.error(f"Database error while creating user: {e}")
+            logger.exception(f"Database error while creating user: ")
             return False
 
     @staticmethod
@@ -102,5 +104,5 @@ class UserService:
                         )
             return None
         except aiosqlite.Error as e:
-            logger.error(f"Database error while getting user: {e}")
+            logger.exception(f"Database error while getting user: ")
             return None

@@ -1,43 +1,35 @@
 import logging
 import sys
-from logging.handlers import RotatingFileHandler
-from pathlib import Path
+import os
+from config import Config
 
-def setup_logging(name: str = __name__) -> logging.Logger:
-    # Створюємо логер
+level = logging.DEBUG if Config.DEBUG else logging.INFO
+
+def get_logger(name: str = "bot"):
     logger = logging.getLogger(name)
-    logger.setLevel(logging.INFO)
+    logger.setLevel(level)
 
-    logging.basicConfig(
-        level=logging.DEBUG,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    # Створюємо директорію для логів якщо її немає
-    log_dir = Path("logs")
-    log_dir.mkdir(exist_ok=True)
+    if logger.handlers:
+        return logger
+    
+    log_format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    formatter = logging.Formatter(log_format)
 
-    # Форматування логів
-    formatter = logging.Formatter(
-        '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    )
-    # Хендлер для консолі
+    # Консольний обробник
     console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setLevel(level)
     console_handler.setFormatter(formatter)
     logger.addHandler(console_handler)
 
-    # Хендлер для файлу
-    file_handler = RotatingFileHandler(
-        log_dir / "bot.log",
-        maxBytes=10485760,  # 10MB
-        backupCount=5,
-        encoding='utf-8'
-    )
+    # Запис логів в bot.log
+    log_dir = 'logs/'
+    log_path = 'logs/bot.log'
+
+    os.makedirs(log_dir, exist_ok=True)
+
+    file_handler = logging.FileHandler(log_path, encoding='utf-8-sig')
+    file_handler.setLevel(level)
     file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)
 
     return logger
-
-# Створюємо глобальний логер
-logger = setup_logging()
-
-# Експортуємо
-__all__ = ['setup_logging', 'logger']

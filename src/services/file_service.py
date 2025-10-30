@@ -1,5 +1,8 @@
 from typing import Dict, List
-import logging
+
+from utils.logging import get_logger
+
+logger = get_logger("services/file_service")
 
 class FileService:
     @staticmethod
@@ -29,7 +32,7 @@ class FileService:
                 raise ValueError(f"Unsupported file type: {file_data['type']}")
                 
         except Exception as e:
-            logging.error(f"Error processing file: {e}")
+            logger.exception(f"Error processing file: ")
             raise
 
     @staticmethod
@@ -59,5 +62,5 @@ class FileService:
                 first_message = False
                 
         except Exception as e:
-            logging.error(f"Error sending files to client: {e}")
+            logger.exception(f"Error sending files to client: ")
             raise

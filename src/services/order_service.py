@@ -2,15 +2,16 @@ import aiosqlite
 from datetime import datetime
 
 from aiogram import Bot
-from typing import Optional, Dict, Any
-
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+from typing import Optional, Dict, Any
 
 from model.order import OrderStatus
 from utils.dict import work_dict
+from utils.logging import get_logger
 
 from config import Config
-from utils.logging import logger
+
+logger = get_logger("services/order_service")
 
 class OrderService:
     
@@ -23,7 +24,7 @@ class OrderService:
             db.row_factory = aiosqlite.Row
             return db
         except Exception as e:
-            logger.error(f"Error creating database connection: {e}")
+            logger.exception(f"Error creating database connection: ")
             raise
 
     async def create_order(self, order_data: Dict[str, Any]) -> Optional[str]:
@@ -70,7 +71,7 @@ class OrderService:
             await db.commit()
             return new_id
         except Exception as e:
-            logger.error(f"Error creating order: {e}")
+            logger.exception(f"Error creating order: ")
             return None
         finally:
             if db:
@@ -98,7 +99,7 @@ class OrderService:
             return True
         
         except Exception as e:
-            logger.error(f"Error update status order {order_id} IN_PROGRESS: {e}")
+            logger.exception(f"Error update status order {order_id} IN_PROGRESS: ")
             return False
         finally:
             if db:
@@ -125,7 +126,7 @@ class OrderService:
             await db.commit()
             return True
         except Exception as e:
-            logger.error(f"Error update status order {order_id} COMPLETED: {e}")
+            logger.exception(f"Error update status order {order_id} COMPLETED: ")
             return False
         finally:
             if db:
@@ -168,7 +169,7 @@ class OrderService:
             return new_id
             
         except Exception as e:
-            logger.error(f"Error processing new order: {e}")
+            logger.exception(f"Error processing new order: ")
             return None
             
     async def _send_admin_notification(
@@ -206,7 +207,7 @@ class OrderService:
             )
             
         except Exception as e:
-            logger.error(f"Error sending admin notification: {e}")
+            logger.exception(f"Error sending admin notification: ")
             raise
 
     async def get_worker_orders(worker_id: int) -> list:
@@ -249,7 +250,7 @@ class OrderService:
                       OrderStatus.NEW.value)) as cursor:
                     return [dict(row) for row in await cursor.fetchall()]
         except Exception as e:
-            logger.error(f"Помилка отримання замовлень воркера: {e}")
+            logger.exception(f"Помилка отримання замовлень воркера: ")
             return []
 
     

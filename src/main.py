@@ -15,8 +15,10 @@ from handlers.statistics import statistics_router
 from handlers.users import user_router
 
 from services.database_service import DBCreator
-from utils.logging import logger
+from utils.logging import get_logger
 from config import Config
+
+logger = get_logger("MAIN")
 
 class BotRunner:
     def __init__(self):
@@ -52,9 +54,9 @@ class BotRunner:
             if await DBCreator.create_tables() == True:
                 logger.info("Таблиці бази даних успішно створені")
             else:
-                logger.error(f"Помилка при створені створені БД")
+                logger.exception(f"Помилка при створені створені БД")
         except Exception as e:
-            logger.error(f"Помилка ініціалізації сервісів: {e}")
+            logger.exception(f"Помилка ініціалізації сервісів: ")
             raise
 
     async def start(self):
@@ -94,7 +96,7 @@ class BotRunner:
                 await polling_task
                 
         except Exception as e:
-            logger.error(f"Помилка запуску бота: {e}")
+            logger.exception(f"Помилка запуску бота: ")
             raise
         finally:
             if self.bot:
@@ -109,7 +111,7 @@ def run_bot():
     except KeyboardInterrupt:
         logger.info("Бот зупинений користувачем")
     except Exception as e:
-        logger.error(f"Критична помилка: {e}")
+        logger.exception(f"Критична помилка: ")
 
 if __name__ == "__main__":
     run_bot()

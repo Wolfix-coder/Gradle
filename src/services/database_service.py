@@ -3,10 +3,12 @@ import aiosqlite
 from typing import Optional, Dict, Any, List
 
 from model.order import OrderStatus
-from utils.logging import logger
+from utils.logging import get_logger
 from utils.validators import _validate_table_column
 
 from config import Config
+
+logger = get_logger("services/database_service")
 
 class DBCreator:
     @staticmethod
@@ -31,7 +33,7 @@ class DBCreator:
                     """)
                     await db.commit()
                 except aiosqlite.Error as e:
-                    logger.error(f"Error create table user_data: {e}")
+                    logger.exception(f"Error create table user_data: ")
 
             try:
                 async with aiosqlite.connect(Config.DATABASE_PATH) as db:
@@ -53,7 +55,7 @@ class DBCreator:
                     """)
                     await db.commit()
             except aiosqlite.Error as e:
-                    logger.error(f"Error create table order_request: {e}")
+                    logger.exception(f"Error create table order_request: ")
 
             try:
                 # Таблиця платежів
@@ -74,10 +76,10 @@ class DBCreator:
                     await db.commit()
                 return True
             except aiosqlite.Error as e:
-                    logger.error(f"Error create table payments: {e}")
+                    logger.exception(f"Error create table payments: ")
         
         except aiosqlite.Error as e:
-            logger.error(f"Database error during table creation: {e}")
+            logger.exception(f"Database error during table creation: ")
             raise
 
 class DatabaseService:
@@ -90,7 +92,7 @@ class DatabaseService:
             db.row_factory = aiosqlite.Row # Для повернення інформації у вигляді (id = '1234', name = 'John', ...)
             return db
         except Exception as e:
-            logger.error(f"Помилка підключення до БД: {e}")
+            logger.exception(f"Помилка підключення до БД: ")
             raise
     
     async def get_by_id(self, table: str, column: str, id_value: Any) -> Optional[Dict]:
@@ -114,10 +116,10 @@ class DatabaseService:
                 row = await cursor.fetchone()
                 return dict(row) if row else None
         except aiosqlite.Error as e:
-            logger.error(f"Помилка отримання данних з бд: {e}")
+            logger.exception(f"Помилка отримання данних з бд: ")
             raise
         except ValueError as e:
-            logger.error(f"Помилка валідації: {e}")
+            logger.exception(f"Помилка валідації: ")
             raise
         finally:
             if db:
@@ -145,10 +147,10 @@ class DatabaseService:
                 return [dict(row) for row in rows]
 
         except aiosqlite.Error as e:
-            logger.error(f"Помилка отримання данних з бд (get_all_by_field()): {e}")
+            logger.exception(f"Помилка отримання данних з бд (get_all_by_field()): ")
             raise
         except ValueError as e:
-            logger.error(f"Помилка валідації: {e}")
+            logger.exception(f"Помилка валідації: ")
             raise
         finally:
             if db:
@@ -208,5 +210,5 @@ class DatabaseService:
                 }
                 
         except Exception as e:
-            logger.error(f"Помилка при отриманні статистики для працівника {worker_id}: {e}")
+            logger.exception(f"Помилка при отриманні статистики для працівника {worker_id}: ")
             raise

@@ -1,6 +1,8 @@
 import re
 
-from utils.logging import logger
+from utils.logging import get_logger
+
+logger = get_logger("services/admin_service")
 
 class AdminService:
     def parse_command(self, text: str) -> dict:
@@ -79,7 +81,7 @@ class AdminService:
                 )
             return client_message
         except Exception as e:
-            logger.error(f"Помилка при генерації тексту повідомлення (інформація про замовлення): {e}")
+            logger.exception(f"Помилка при генерації тексту повідомлення (інформація про замовлення): ")
             raise
 
     def generate_user_info_message(self, ID: int,
@@ -130,5 +132,5 @@ class AdminService:
                     )
                 return client_message
             except Exception as e:
-                logger.error(f"Помилка при генерації тексту повідомлення (інформація про користувача): {e}")
+                logger.exception(f"Помилка при генерації тексту повідомлення (інформація про користувача): ")
                 raise

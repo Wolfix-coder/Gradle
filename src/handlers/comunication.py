@@ -2,21 +2,19 @@ import aiosqlite
 from aiogram import Router, types, F
 
 from aiogram.filters import Command
-from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
-from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, ContentType, CallbackQuery
+from aiogram.utils.keyboard import InlineKeyboardBuilder
+from aiogram.types import Message, CallbackQuery
 from aiogram.fsm.context import FSMContext
 
 from services.admin_service import AdminService
 from services.database_service import DatabaseService
 from states.user_states import UserState
 from utils.decorators import require_admin
-from utils.logging import logger
-from utils.validators import validate_input, validate_course
-
-from text import support_url
-from config import Config
+from utils.logging import get_logger
 
 comunication_router = Router()
+
+logger = get_logger("handlers/communication")
 
 admin_service = AdminService()
 database_service = DatabaseService()
@@ -110,7 +108,7 @@ async def send_message(message: Message, state: FSMContext):
 
     except Exception as e:
         await message.answer("❌ Виникла помилка при надсиланні повідомлення. Спробуйте пізніше.")
-        logger.error(f"Помилка команди /send_message: {e}")
+        logger.exception(f"Помилка команди /send_message: ")
 
     
 # ==========================================
@@ -145,7 +143,7 @@ async def reply_message_from_user(callback: CallbackQuery, state: FSMContext):
         
     except Exception as e:
         await callback.answer("❌ Ой! Виникла помилка. Спробуйте пізніше.", show_alert=True)
-        logger.error(f"Помилка в reply_message_from_user: {e}")
+        logger.exception(f"Помилка в reply_message_from_user: ")
 
 
 # ==========================================
@@ -197,7 +195,7 @@ async def send_reply_to_admin(message: Message, state: FSMContext):
 
     except Exception as e:
         await message.answer("❌ Виникла помилка при надсиланні повідомлення. Спробуйте пізніше.")
-        logger.error(f"Помилка в send_reply_to_admin: {e}")
+        logger.exception(f"Помилка в send_reply_to_admin: ")
         await state.clear()
 
     
@@ -233,7 +231,7 @@ async def reply_message_from_admin(callback: CallbackQuery, state: FSMContext):
         
     except Exception as e:
         await callback.answer("❌ Ой! Виникла помилка. Спробуйте пізніше.", show_alert=True)
-        logger.error(f"Помилка в reply_message_from_admin: {e}")
+        logger.exception(f"Помилка в reply_message_from_admin: ")
 
 
 # ==========================================
@@ -285,5 +283,5 @@ async def send_reply_to_user(message: Message, state: FSMContext):
 
     except Exception as e:
         await message.answer("❌ Виникла помилка при надсиланні повідомлення. Спробуйте пізніше.")
-        logger.error(f"Помилка в send_reply_to_user: {e}")
+        logger.exception(f"Помилка в send_reply_to_user: ")
         await state.clear()

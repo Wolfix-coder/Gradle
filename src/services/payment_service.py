@@ -5,7 +5,9 @@ from typing import Optional, Dict
 
 from model.payments import Payments
 from services.database_service import DatabaseService
-from utils.logging import logger
+from utils.logging import get_logger
+
+logger = get_logger("services/payment_service")
 
 database_service = DatabaseService()
 
@@ -37,10 +39,10 @@ class PaymentService:
             await db.commit()
             return True
         except aiosqlite.Error as e:
-            logger.error(f"Помилка бази данних (внесення прайсу в БД): {e}")
+            logger.exception(f"Помилка бази данних (внесення прайсу в БД): ")
             return False
         except Exception as e:
-            logger.error(f"Помилка внесення прайсу в БД: {e}")
+            logger.exception(f"Помилка внесення прайсу в БД: ")
             return False
         finally:
             if db:
@@ -79,10 +81,10 @@ class PaymentService:
                         return [Payments(**dict(row)) for row in rows]
 
                 except aiosqlite.Error as e:
-                    logger.error(f"Помилка бази данних при отриманні данних з таблиці payments: {e}")
+                    logger.exception(f"Помилка бази данних при отриманні данних з таблиці payments: ")
 
         except Exception as e:
-            logger.error(f"Помилка отримання не оплачених замовлень: {e}")
+            logger.exception(f"Помилка отримання не оплачених замовлень: ")
             raise
         finally:
             if db:
@@ -115,7 +117,7 @@ class PaymentService:
             return True
 
         except Exception as e:
-            logger.error(f"Замовлення {order_id} не позначено як оплачене: {e}")
+            logger.exception(f"Замовлення {order_id} не позначено як оплачене: ")
             return False
         finally:
             if db:

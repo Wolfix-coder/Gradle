@@ -9,7 +9,7 @@ from aiogram.fsm.context import FSMContext
 from services.database_service import DatabaseService
 from states.user_states import UserState
 from utils.validators import validate_input, validate_course
-from utils.logging import logger
+from utils.logging import get_logger
 
 from text import support_url
 from config import Config
@@ -21,6 +21,8 @@ MAX_GROUP_LENGTH = 10
 ALLOWED_COURSES = ['1', '2', '3', '4']
 
 user_router = Router()
+
+logger = get_logger("handlers/users")
 
 database_service = DatabaseService()
 
@@ -38,7 +40,7 @@ async def cmd_start(message: types.Message):
             reply_markup=phone_keyboard
         )
     except Exception as e:
-        logger.error(f"Error in start command: {e}")
+        logger.exception(f"Error in start command: ")
         await message.answer("Виникла помилка. Спробуйте пізніше.")
 
 @user_router.message(F.content_type == ContentType.CONTACT)
@@ -61,7 +63,7 @@ async def handle_contact(message: types.Message, state: FSMContext):
         await message.answer("Будь ласка, введіть своє ім'я та по батькові.")
         await state.set_state(UserState.waiting_for_real_full_name)
     except Exception as e:
-        logger.error(f"Error handling contact: {e}")
+        logger.exception(f"Error handling contact: ")
         await message.answer("Виникла помилка. Спробуйте пізніше.")
 
 @user_router.message(UserState.waiting_for_real_full_name)
@@ -229,9 +231,9 @@ async def get_group(message: Message, state: FSMContext):
         await state.clear()
         
     except aiosqlite.Error as e:
-        logger.error(f"Database error while saving user data: {e}")
+        logger.exception(f"Database error while saving user data: ")
         await message.answer("Виникла помилка при збереженні даних. Спробуйте пізніше.")
     except Exception as e:
-        logger.error(f"Unexpected error in get_group: {e}")
+        logger.exception(f"Unexpected error in get_group: ")
         await message.answer("Виникла непередбачена помилка. Спробуйте пізніше.")
 

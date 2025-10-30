@@ -2,16 +2,17 @@ from aiogram import Router
 from aiogram.types import CallbackQuery
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-
 from services.database_service import DatabaseService
 from utils.decorators import require_admin
-from utils.logging import logger
 from utils.keyboards import get_admin_keyboard
+from utils.logging import get_logger
 
 from config import Config
 
 # Створення роутерів
 statistics_router = Router(name='statistics')
+
+logger = get_logger("handlers/statics")
 
 # Створення об'єктів сервісів
 database_service = DatabaseService()
@@ -47,7 +48,7 @@ async def show_statistics(callback: CallbackQuery) -> None:
         )
 
     except Exception as e:
-        logger.error(f"Помилка при показі статистики: {e}")
+        logger.exception(f"Помилка при показі статистики: ")
         await callback.message.edit_text(
             "Сталася помилка при отриманні статистики. Спробуйте пізніше.",
             reply_markup=get_admin_keyboard().as_markup()

@@ -1,6 +1,6 @@
 from functools import wraps
 from aiogram.types import Message
-from config import Config  # Змінено імпорт
+from config import Config  
 
 def require_admin(func):
     @wraps(func)
