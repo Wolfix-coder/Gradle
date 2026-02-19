@@ -373,10 +373,13 @@ async def finish_sending_work(callback: CallbackQuery, state: FSMContext) -> Non
         order_id = callback.data.split("_")[2]
         order = await database_service.get_by_id('order_request', 'ID_order', order_id)
         payment = await database_service.get_by_id('payments', 'ID_order', order_id)
-        payment_status = "❌ Не оплачено" if int(payment["status"]) == 0 else "✅ Оплачено"
 
         if payment['status'] == 0:
             try:
+                await callback.bot.send_message(order['ID_worker'], text=(
+                    f"Клієнт ще не оплатив замовлення. Почекайте трішки.\n"
+                    f"Повідомлення про оплату було надіслано користувачу."
+                ))
                 await callback.bot.send_message(order['ID_user'], text=(
                     f"Замовлення вже виконано, але оплата не була проведена.\n" 
                     f"Якщо ви виконали оплату для данного замовлення, фле бачите це повідомлення зверніться в центр підтримки /support та надішліть скрін оплати.\n" 
@@ -388,7 +391,7 @@ async def finish_sending_work(callback: CallbackQuery, state: FSMContext) -> Non
                     f"📚 Предмет: {work_dict.subjects.get(order['subject'], order['subject'])}\n"
                     f"📝 Тип роботи: {work_dict.type_work.get(order['type_work'], order['type_work'])}\n"
                     f"💰 Ціна: {payment["price"]} грн\n"
-                    f"💳 Статус оплати: {payment_status}\n"
+                    f"💳 Статус оплати: {work_dict.status_payment.get(payment['status'], payment['status'])}\n"
                     f"📅 Створено: {order['created_at']}\n"
                 )
                 await callback.bot.send_message(order['ID_user'], text=payment_text)
@@ -816,7 +819,7 @@ async def show_worker_orders_handler(callback: CallbackQuery) -> None:
                     f"👤 Замовник: @{order['user_link']}\n"
                     f"📅 Створено: {order['created_at']}\n"
                     f"📋 Деталі: {order['order_details']}\n"
-                    f"Статус: {'🔄 В роботі' if order['status'] == OrderStatus.IN_PROGRESS.value else '🆕 Нове'}"
+                    f"Статус: {work_dict.status_order.get(order['status'], order['status'])}"
                 )
 
                 order_keyboard = get_worker_order_keyboard(order['ID_order'])
@@ -843,35 +846,3 @@ async def show_worker_orders_handler(callback: CallbackQuery) -> None:
                 # Якщо не вдалося відредагувати, спробуємо відправити нове повідомлення
                 logger.exception(f"Додаткова помилка при спробі відредагувати повідомлення: {edit_error}")
                 await callback.answer("Сталася помилка при отриманні замовлень", show_alert=True)
-
-
-# async def get_orders_with_users(self, status: str) -> List[Dict]:
-
-#         """
-#         Отримати замовлення разом з даними користувачів
-    
-#         Args:
-#             status: str - статус замовлень ('pending', 'completed', etc.)
-    
-#         Returns:
-#             List[Dict] - список замовлень з даними користувачів
-#         """
-    
-#         # 1. Отримуємо всі замовлення по статусу
-#         orders = await self.get_orders_with_users()
-    
-#         # 2. Для кожного замовлення додаємо дані користувача
-#         for order in orders:
-#             user = await self.get_by_id('user_data', 'ID', order['ID_user'])
-        
-#             # Додаємо дані користувача до замовлення
-#             if user:
-#                 order['user_name'] = user['user_name']
-#                 order['user_link'] = user['user_link']
-#             else:
-#                 # Якщо користувача не знайдено
-#                 order['user_name'] = None
-#                 order['user_link'] = None
-    
-#         return orders
-
